@@ -68,7 +68,7 @@ func (f *MacrotrendsFetcher) getCompanySlug(symbol string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("search returned status %d", resp.StatusCode)
@@ -135,7 +135,7 @@ func (f *MacrotrendsFetcher) FetchPERatio(symbol string) (*FundamentalData, erro
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("iframe returned status %d", resp.StatusCode)
@@ -228,7 +228,7 @@ func (f *MacrotrendsFetcher) FetchDailyPrices(symbol string, days int) ([]DailyP
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("price history returned status %d", resp.StatusCode)

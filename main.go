@@ -34,7 +34,7 @@ func WriteCSV(data []StockData, filename string, includePE bool) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
@@ -68,7 +68,7 @@ func WriteJSON(data []StockData, filename string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
@@ -81,22 +81,22 @@ func WriteTable(data []StockData, filename string, includePE bool) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if includePE {
-		fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s\n",
+		_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s\n",
 			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "PE")
-		fmt.Fprintln(file, strings.Repeat("-", 95))
+		_, _ = fmt.Fprintln(file, strings.Repeat("-", 95))
 		for _, d := range data {
-			fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s\n",
+			_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s\n",
 				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE)
 		}
 	} else {
-		fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s\n",
+		_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s\n",
 			"Date", "Open", "High", "Low", "Close", "Volume", "Change")
-		fmt.Fprintln(file, strings.Repeat("-", 85))
+		_, _ = fmt.Fprintln(file, strings.Repeat("-", 85))
 		for _, d := range data {
-			fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s\n",
+			_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s\n",
 				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change)
 		}
 	}
@@ -245,6 +245,86 @@ func fetchHKStock(symbol string, days int) ([]StockData, error) {
 	return reverseData(yahooData), nil
 }
 
+// getOutputExtension returns the file extension for the given format
+func getOutputExtension(format string) string {
+	switch format {
+	case "json":
+		return "json"
+	case "table":
+		return "txt"
+	default:
+		return "csv"
+	}
+}
+
+// adjustOutputFilename ensures the output filename has the correct extension
+func adjustOutputFilename(output, format string) string {
+	switch format {
+	case "json":
+		if !strings.HasSuffix(output, ".json") {
+			return strings.TrimSuffix(output, ".csv") + ".json"
+		}
+	case "table":
+		if !strings.HasSuffix(output, ".txt") {
+			return strings.TrimSuffix(output, ".csv") + ".txt"
+		}
+	}
+	return output
+}
+
+// writeDailyOutput writes daily stock data in the specified format
+func writeDailyOutput(data []StockData, output, format string, includePE bool) error {
+	output = adjustOutputFilename(output, format)
+	switch format {
+	case "json":
+		return WriteJSON(data, output)
+	case "table":
+		return WriteTable(data, output, includePE)
+	default:
+		return WriteCSV(data, output, includePE)
+	}
+}
+
+// writePeriodOutput writes period data in the specified format
+func writePeriodOutput(data []PeriodData, output, format string, includePE bool) error {
+	output = adjustOutputFilename(output, format)
+	switch format {
+	case "json":
+		return WritePeriodJSON(data, output)
+	case "table":
+		return WritePeriodTable(data, output, includePE)
+	default:
+		return WritePeriodCSV(data, output, includePE)
+	}
+}
+
+// printDailyPreview prints a preview of daily data
+func printDailyPreview(data []StockData, count int, includePE bool) {
+	if includePE {
+		fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s\n",
+			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "PE")
+		fmt.Println(strings.Repeat("-", 95))
+		for i, d := range data {
+			if i >= count {
+				break
+			}
+			fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s\n",
+				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE)
+		}
+	} else {
+		fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s\n",
+			"Date", "Open", "High", "Low", "Close", "Volume", "Change")
+		fmt.Println(strings.Repeat("-", 85))
+		for i, d := range data {
+			if i >= count {
+				break
+			}
+			fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s\n",
+				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change)
+		}
+	}
+}
+
 func printUsage() {
 	fmt.Println("Stock Price Fetcher - Fetch historical stock data with P/E ratio")
 	fmt.Println()
@@ -337,13 +417,7 @@ func main() {
 
 	// Set default output filename
 	if *output == "" {
-		ext := "csv"
-		switch *format {
-		case "json":
-			ext = "json"
-		case "table":
-			ext = "txt"
-		}
+		ext := getOutputExtension(*format)
 		if *period != "" {
 			*output = fmt.Sprintf("%s_%s.%s", strings.ToUpper(*symbol), *period, ext)
 		} else {
@@ -398,81 +472,26 @@ func main() {
 
 		fmt.Printf("Aggregated into %d %s periods\n", len(periodData), *period)
 
-		// Write period output
-		switch *format {
-		case "json":
-			if !strings.HasSuffix(*output, ".json") {
-				*output = strings.TrimSuffix(*output, ".csv") + ".json"
-			}
-			err = WritePeriodJSON(periodData, *output)
-		case "table":
-			if !strings.HasSuffix(*output, ".txt") {
-				*output = strings.TrimSuffix(*output, ".csv") + ".txt"
-			}
-			err = WritePeriodTable(periodData, *output, includePE)
-		default:
-			err = WritePeriodCSV(periodData, *output, includePE)
-		}
-
-		if err != nil {
+		*output = adjustOutputFilename(*output, *format)
+		if err = writePeriodOutput(periodData, *output, *format, includePE); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
 			os.Exit(1)
 		}
 
 		fmt.Printf("Data saved to %s\n", *output)
-
-		// Show preview
 		fmt.Println("\nPreview (first 5 periods):")
 		PrintPeriodPreview(periodData, 5, includePE)
 		return
 	}
 
 	// Write daily output
-	switch *format {
-	case "json":
-		if !strings.HasSuffix(*output, ".json") {
-			*output = strings.TrimSuffix(*output, ".csv") + ".json"
-		}
-		err = WriteJSON(data, *output)
-	case "table":
-		if !strings.HasSuffix(*output, ".txt") {
-			*output = strings.TrimSuffix(*output, ".csv") + ".txt"
-		}
-		err = WriteTable(data, *output, includePE)
-	default:
-		err = WriteCSV(data, *output, includePE)
-	}
-
-	if err != nil {
+	*output = adjustOutputFilename(*output, *format)
+	if err = writeDailyOutput(data, *output, *format, includePE); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("Data saved to %s\n", *output)
-
-	// Show preview
 	fmt.Println("\nPreview (first 5 records):")
-	if includePE {
-		fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "PE")
-		fmt.Println(strings.Repeat("-", 95))
-		for i, d := range data {
-			if i >= 5 {
-				break
-			}
-			fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE)
-		}
-	} else {
-		fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change")
-		fmt.Println(strings.Repeat("-", 85))
-		for i, d := range data {
-			if i >= 5 {
-				break
-			}
-			fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change)
-		}
-	}
+	printDailyPreview(data, 5, includePE)
 }

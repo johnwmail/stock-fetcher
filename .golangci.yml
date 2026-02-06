@@ -19,4 +19,5 @@ linters:
     gocyclo:
       # Minimal code complexity to report.
       # Default: 30 (but we recommend 10-20)
-      min-complexity: 15
+      # Raised to 20 for CLI main functions
+      min-complexity: 20

@@ -269,7 +269,7 @@ func WritePeriodCSV(data []PeriodData, filename string, includePE bool) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
@@ -309,7 +309,7 @@ func WritePeriodJSON(data []PeriodData, filename string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
@@ -322,23 +322,23 @@ func WritePeriodTable(data []PeriodData, filename string, includePE bool) error 
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if includePE {
-		fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %5s %5s %5s %5s\n",
+		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %5s %5s %5s %5s\n",
 			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "D2%", "D3%", "D4%", "D5%")
-		fmt.Fprintln(file, strings.Repeat("-", 140))
+		_, _ = fmt.Fprintln(file, strings.Repeat("-", 140))
 		for _, d := range data {
-			fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %5d %5d %5d %5d\n",
+			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %5d %5d %5d %5d\n",
 				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE,
 				d.Days, d.Drop2Pct, d.Drop3Pct, d.Drop4Pct, d.Drop5Pct)
 		}
 	} else {
-		fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %5s %5s %5s %5s\n",
+		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %5s %5s %5s %5s\n",
 			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "D2%", "D3%", "D4%", "D5%")
-		fmt.Fprintln(file, strings.Repeat("-", 130))
+		_, _ = fmt.Fprintln(file, strings.Repeat("-", 130))
 		for _, d := range data {
-			fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5d %5d %5d %5d %5d\n",
+			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5d %5d %5d %5d %5d\n",
 				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change,
 				d.Days, d.Drop2Pct, d.Drop3Pct, d.Drop4Pct, d.Drop5Pct)
 		}
