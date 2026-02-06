@@ -184,7 +184,14 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, string, error)
 		return nil, 0, "", fmt.Errorf("failed to fetch P/E data: %w", err)
 	}
 	latestEPS := peData.GetLatestTTM_EPS()
-	companyName := peData.CompanyName
+
+	// Get company name from Yahoo Finance (more reliable than macrotrends slug)
+	yahooFetcher := NewYahooFetcher()
+	companyName, _ := yahooFetcher.FetchCompanyName(symbol)
+	if companyName == "" {
+		// Fallback to macrotrends slug
+		companyName = peData.CompanyName
+	}
 
 	// Get daily prices
 	prices, err := fetcher.FetchDailyPrices(symbol, days)
@@ -301,6 +308,35 @@ func adjustOutputFilename(output, format string) string {
 		}
 	}
 	return output
+}
+
+// fetchStockData fetches stock data from appropriate source
+// Returns: data, ttmEPS, companyName, includePE, error
+func fetchStockData(symbol string, days int, useYahoo bool) ([]StockData, float64, string, bool, error) {
+	var data []StockData
+	var companyName string
+	var ttmEPS float64
+	var err error
+	includePE := false
+
+	if useYahoo {
+		// Use Yahoo Finance (no P/E)
+		fmt.Printf("Fetching %d days of data for %s from Yahoo Finance...\n", days, strings.ToUpper(symbol))
+		data, companyName, err = fetchHKStock(symbol, days)
+	} else {
+		// Use macrotrends (with P/E)
+		fmt.Printf("Fetching %d days of data for %s from macrotrends.net...\n", days, strings.ToUpper(symbol))
+		data, ttmEPS, companyName, err = fetchUSStock(symbol, days)
+		if err != nil {
+			// Fallback to Yahoo Finance for ETFs or unsupported stocks
+			fmt.Printf("Macrotrends failed, falling back to Yahoo Finance...\n")
+			data, companyName, err = fetchHKStock(symbol, days)
+		} else {
+			includePE = true
+		}
+	}
+
+	return data, ttmEPS, companyName, includePE, err
 }
 
 // writeDailyOutput writes daily stock data in the specified format
@@ -456,26 +492,9 @@ func main() {
 		}
 	}
 
-	var data []StockData
-	var err error
-	var ttmEPS float64
-	includePE := false
-
-	// Determine data source
+	// Determine data source and fetch data
 	useYahoo := isHKStock(*symbol) || *source == "yahoo"
-
-	var companyName string
-	if useYahoo {
-		// Use Yahoo Finance (no P/E)
-		fmt.Printf("Fetching %d days of data for %s from Yahoo Finance...\n", *days, strings.ToUpper(*symbol))
-		data, companyName, err = fetchHKStock(*symbol, *days)
-	} else {
-		// Use macrotrends (with P/E)
-		fmt.Printf("Fetching %d days of data for %s from macrotrends.net...\n", *days, strings.ToUpper(*symbol))
-		data, ttmEPS, companyName, err = fetchUSStock(*symbol, *days)
-		includePE = true
-	}
-
+	data, ttmEPS, companyName, includePE, err := fetchStockData(*symbol, *days, useYahoo)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error fetching data: %v\n", err)
 		os.Exit(1)

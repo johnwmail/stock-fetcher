@@ -24,6 +24,43 @@ func NewYahooFetcher() *YahooFetcher {
 	}
 }
 
+// FetchCompanyName fetches just the company name from Yahoo Finance
+func (f *YahooFetcher) FetchCompanyName(symbol string) (string, error) {
+	url := fmt.Sprintf(
+		"https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=1d",
+		strings.ToUpper(symbol),
+	)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var chartResp YahooChartResponse
+	if err := json.NewDecoder(resp.Body).Decode(&chartResp); err != nil {
+		return "", err
+	}
+
+	if len(chartResp.Chart.Result) == 0 {
+		return "", nil
+	}
+
+	name := chartResp.Chart.Result[0].Meta.LongName
+	if name == "" {
+		name = chartResp.Chart.Result[0].Meta.ShortName
+	}
+	return name, nil
+}
+
 // YahooChartResponse represents the Yahoo Finance chart API response
 type YahooChartResponse struct {
 	Chart struct {
@@ -54,7 +91,6 @@ type YahooChartResponse struct {
 	} `json:"chart"`
 }
 
-// FetchHistoricalData fetches historical data from Yahoo Finance using the chart API
 // FetchHistoricalData fetches historical data from Yahoo Finance using the chart API
 // Returns: data, companyName, error
 func (f *YahooFetcher) FetchHistoricalData(symbol string, startDate, endDate time.Time) ([]StockData, string, error) {

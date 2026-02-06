@@ -93,7 +93,7 @@ func (f *MacrotrendsFetcher) getCompanySlug(symbol string) (string, error) {
 		return "", fmt.Errorf("no results found for symbol %s", symbol)
 	}
 
-	// Find exact match or first result
+	// Find exact match only - don't fall back to first result
 	for _, r := range results {
 		parts := strings.Split(r.Symbol, "/")
 		if len(parts) == 2 && strings.EqualFold(parts[0], symbol) {
@@ -101,8 +101,8 @@ func (f *MacrotrendsFetcher) getCompanySlug(symbol string) (string, error) {
 		}
 	}
 
-	// Return first result if no exact match
-	return results[0].Symbol, nil
+	// No exact match found
+	return "", fmt.Errorf("symbol %s not found on macrotrends (may be an ETF or unsupported stock)", symbol)
 }
 
 // FetchPERatio fetches P/E ratio data for a symbol
