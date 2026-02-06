@@ -33,3 +33,6 @@ go.work.sum
 
 stock-fetcher
 main
+*.csv
+*.txt
+*.json
