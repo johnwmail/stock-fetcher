@@ -184,14 +184,7 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, string, error)
 		return nil, 0, "", fmt.Errorf("failed to fetch P/E data: %w", err)
 	}
 	latestEPS := peData.GetLatestTTM_EPS()
-
-	// Get company name from Yahoo Finance (more reliable than macrotrends slug)
-	yahooFetcher := NewYahooFetcher()
-	companyName, _ := yahooFetcher.FetchCompanyName(symbol)
-	if companyName == "" {
-		// Fallback to macrotrends slug
-		companyName = peData.CompanyName
-	}
+	companyName := peData.CompanyName
 
 	// Get daily prices
 	prices, err := fetcher.FetchDailyPrices(symbol, days)
