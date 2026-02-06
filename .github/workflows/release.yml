@@ -4,13 +4,35 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v0.1.1)'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 jobs:
+  validate:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag format
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+ ]]; then
+            echo "Error: Tag must begin with 'v' followed by version number (e.g., v1.0, v1.0.1, v2.0.0-beta.1)"
+            echo "Provided tag: $TAG"
+            exit 1
+          fi
+          echo "Tag format valid: $TAG"
+
   build:
     runs-on: ubuntu-latest
+    needs: [validate]
+    if: always() && (needs.validate.result == 'success' || needs.validate.result == 'skipped')
     strategy:
       matrix:
         include:
@@ -20,18 +42,18 @@ jobs:
           - goos: linux
             goarch: arm64
             suffix: ''
-          - goos: darwin
-            goarch: amd64
-            suffix: ''
-          - goos: darwin
-            goarch: arm64
-            suffix: ''
           - goos: windows
             goarch: amd64
             suffix: '.exe'
-          - goos: windows
-            goarch: arm64
-            suffix: '.exe'
+#          - goos: windows
+#            goarch: arm64
+#            suffix: '.exe'
+#          - goos: darwin
+#            goarch: amd64
+#            suffix: ''
+#          - goos: darwin
+#            goarch: arm64
+#            suffix: ''
 
     steps:
       - name: Checkout code
@@ -42,13 +64,22 @@ jobs:
         with:
           go-version: '1.24'
 
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build binary
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
           mkdir -p dist
-          go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" -o dist/stock-fetcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
+          go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }}" -o dist/stock-fetcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -62,6 +93,23 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push tag (manual trigger only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git tag ${{ steps.version.outputs.version }}
+          git push origin ${{ steps.version.outputs.version }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -81,8 +129,9 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.version }}
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           generate_release_notes: true
           files: |
             dist/*
