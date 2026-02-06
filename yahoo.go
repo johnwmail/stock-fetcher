@@ -113,7 +113,7 @@ func parseYahooChartData(resp YahooChartResponse) ([]StockData, error) {
 	quote := result.Indicators.Quote[0]
 
 	var data []StockData
-	var prevClose float64
+	var prevClose, prevHigh float64
 
 	for i, ts := range timestamps {
 		if i >= len(quote.Close) {
@@ -144,24 +144,34 @@ func parseYahooChartData(resp YahooChartResponse) ([]StockData, error) {
 			volume = quote.Volume[i]
 		}
 
+		// Calculate change % (close to close)
 		change := ""
 		if prevClose > 0 {
 			pctChange := ((quote.Close[i] - prevClose) / prevClose) * 100
 			change = fmt.Sprintf("%.2f%%", pctChange)
 		}
 
+		// Calculate HChange % (close relative to previous high)
+		hchange := ""
+		if prevHigh > 0 {
+			pctHChange := ((quote.Close[i] - prevHigh) / prevHigh) * 100
+			hchange = fmt.Sprintf("%.2f%%", pctHChange)
+		}
+
 		sd := StockData{
-			Date:   date,
-			Open:   formatFloat(openVal),
-			High:   formatFloat(highVal),
-			Low:    formatFloat(lowVal),
-			Close:  formatFloat(quote.Close[i]),
-			Volume: formatVolume(volume),
-			Change: change,
+			Date:    date,
+			Open:    formatFloat(openVal),
+			High:    formatFloat(highVal),
+			Low:     formatFloat(lowVal),
+			Close:   formatFloat(quote.Close[i]),
+			Volume:  formatVolume(volume),
+			Change:  change,
+			HChange: hchange,
 		}
 
 		data = append(data, sd)
 		prevClose = quote.Close[i]
+		prevHigh = highVal
 	}
 
 	return data, nil

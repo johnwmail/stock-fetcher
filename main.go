@@ -13,14 +13,15 @@ import (
 
 // StockData represents a single day's stock data
 type StockData struct {
-	Date   string `json:"date"`
-	Open   string `json:"open"`
-	High   string `json:"high"`
-	Low    string `json:"low"`
-	Close  string `json:"close"`
-	Volume string `json:"volume"`
-	Change string `json:"change"`
-	PE     string `json:"pe,omitempty"`
+	Date    string `json:"date"`
+	Open    string `json:"open"`
+	High    string `json:"high"`
+	Low     string `json:"low"`
+	Close   string `json:"close"`
+	Volume  string `json:"volume"`
+	Change  string `json:"change"`
+	HChange string `json:"hchange"` // Change from previous high
+	PE      string `json:"pe,omitempty"`
 }
 
 // isHKStock checks if the symbol is a Hong Kong stock
@@ -40,20 +41,20 @@ func WriteCSV(data []StockData, filename string, includePE bool) error {
 	defer writer.Flush()
 
 	if includePE {
-		if err := writer.Write([]string{"Date", "Open", "High", "Low", "Close", "Volume", "Change", "PE"}); err != nil {
+		if err := writer.Write([]string{"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE"}); err != nil {
 			return err
 		}
 		for _, d := range data {
-			if err := writer.Write([]string{d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE}); err != nil {
+			if err := writer.Write([]string{d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE}); err != nil {
 				return err
 			}
 		}
 	} else {
-		if err := writer.Write([]string{"Date", "Open", "High", "Low", "Close", "Volume", "Change"}); err != nil {
+		if err := writer.Write([]string{"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange"}); err != nil {
 			return err
 		}
 		for _, d := range data {
-			if err := writer.Write([]string{d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change}); err != nil {
+			if err := writer.Write([]string{d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange}); err != nil {
 				return err
 			}
 		}
@@ -84,20 +85,20 @@ func WriteTable(data []StockData, filename string, includePE bool) error {
 	defer func() { _ = file.Close() }()
 
 	if includePE {
+		_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s %10s\n",
+			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE")
+		_, _ = fmt.Fprintln(file, strings.Repeat("-", 105))
+		for _, d := range data {
+			_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s %10s\n",
+				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE)
+		}
+	} else {
 		_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "PE")
+			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange")
 		_, _ = fmt.Fprintln(file, strings.Repeat("-", 95))
 		for _, d := range data {
 			_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE)
-		}
-	} else {
-		_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change")
-		_, _ = fmt.Fprintln(file, strings.Repeat("-", 85))
-		for _, d := range data {
-			_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change)
+				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange)
 		}
 	}
 
@@ -191,7 +192,7 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, error) {
 
 	// Convert to StockData with P/E (calculate change from old to new first)
 	var data []StockData
-	var prevClose float64
+	var prevClose, prevHigh float64
 
 	for _, p := range prices {
 		close, _ := strconv.ParseFloat(p.Close, 64)
@@ -199,11 +200,18 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, error) {
 		high, _ := strconv.ParseFloat(p.High, 64)
 		low, _ := strconv.ParseFloat(p.Low, 64)
 
-		// Calculate change %
+		// Calculate change % (close to close)
 		change := ""
 		if prevClose > 0 {
 			pctChange := ((close - prevClose) / prevClose) * 100
 			change = fmt.Sprintf("%.2f%%", pctChange)
+		}
+
+		// Calculate HChange % (close relative to previous high)
+		hchange := ""
+		if prevHigh > 0 {
+			pctHChange := ((close - prevHigh) / prevHigh) * 100
+			hchange = fmt.Sprintf("%.2f%%", pctHChange)
 		}
 
 		// Calculate P/E using historical EPS for this date
@@ -214,17 +222,19 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, error) {
 		}
 
 		data = append(data, StockData{
-			Date:   p.Date,
-			Open:   fmt.Sprintf("%.2f", open),
-			High:   fmt.Sprintf("%.2f", high),
-			Low:    fmt.Sprintf("%.2f", low),
-			Close:  fmt.Sprintf("%.2f", close),
-			Volume: p.Volume + "M",
-			Change: change,
-			PE:     pe,
+			Date:    p.Date,
+			Open:    fmt.Sprintf("%.2f", open),
+			High:    fmt.Sprintf("%.2f", high),
+			Low:     fmt.Sprintf("%.2f", low),
+			Close:   fmt.Sprintf("%.2f", close),
+			Volume:  p.Volume + "M",
+			Change:  change,
+			HChange: hchange,
+			PE:      pe,
 		})
 
 		prevClose = close
+		prevHigh = high
 	}
 
 	// Reverse so newest is first
@@ -302,26 +312,26 @@ func writePeriodOutput(data []PeriodData, output, format string, includePE bool)
 // printDailyPreview prints a preview of daily data
 func printDailyPreview(data []StockData, count int, includePE bool) {
 	if includePE {
+		fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s %10s\n",
+			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE")
+		fmt.Println(strings.Repeat("-", 105))
+		for i, d := range data {
+			if i >= count {
+				break
+			}
+			fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s %10s\n",
+				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE)
+		}
+	} else {
 		fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "PE")
+			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange")
 		fmt.Println(strings.Repeat("-", 95))
 		for i, d := range data {
 			if i >= count {
 				break
 			}
 			fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE)
-		}
-	} else {
-		fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change")
-		fmt.Println(strings.Repeat("-", 85))
-		for i, d := range data {
-			if i >= count {
-				break
-			}
-			fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change)
+				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange)
 		}
 	}
 }

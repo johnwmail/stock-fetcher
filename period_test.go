@@ -328,8 +328,8 @@ func TestWritePeriodCSV(t *testing.T) {
 		includePE bool
 		wantCols  int
 	}{
-		{"with_pe", true, 15},
-		{"without_pe", false, 14},
+		{"with_pe", true, 16},    // Added HChange column
+		{"without_pe", false, 15}, // Added HChange column
 	}
 
 	for _, tt := range tests {

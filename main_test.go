@@ -119,18 +119,18 @@ func TestWriteCSV(t *testing.T) {
 		{
 			name: "without PE",
 			data: []StockData{
-				{Date: "2024-01-01", Open: "100.00", High: "105.00", Low: "99.00", Close: "104.00", Volume: "1M", Change: "1.5%"},
+				{Date: "2024-01-01", Open: "100.00", High: "105.00", Low: "99.00", Close: "104.00", Volume: "1M", Change: "1.5%", HChange: "-0.5%"},
 			},
 			includePE: false,
-			wantCols:  7,
+			wantCols:  8, // Added HChange column
 		},
 		{
 			name: "with PE",
 			data: []StockData{
-				{Date: "2024-01-01", Open: "100.00", High: "105.00", Low: "99.00", Close: "104.00", Volume: "1M", Change: "1.5%", PE: "25.5"},
+				{Date: "2024-01-01", Open: "100.00", High: "105.00", Low: "99.00", Close: "104.00", Volume: "1M", Change: "1.5%", HChange: "-0.5%", PE: "25.5"},
 			},
 			includePE: true,
-			wantCols:  8,
+			wantCols:  9, // Added HChange column
 		},
 	}
 

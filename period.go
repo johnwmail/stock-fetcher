@@ -33,6 +33,7 @@ type PeriodData struct {
 	Close     string    `json:"close"`      // Close price of last day
 	Volume    string    `json:"volume"`     // Total volume in period
 	Change    string    `json:"change"`     // Period change percentage
+	HChange   string    `json:"hchange"`    // Change from previous period high
 	PE        string    `json:"pe,omitempty"`
 	Days      int       `json:"days"`       // Number of trading days
 	Drop2Pct  DropCount `json:"drop_2pct"`  // Days with 2-3% drop (C/L)
@@ -168,7 +169,7 @@ func AggregateToPeriods(data []StockData, periodType PeriodType) []PeriodData {
 
 	// Aggregate each period
 	var result []PeriodData
-	var prevPeriodClose float64
+	var prevPeriodClose, prevPeriodHigh float64
 
 	for _, key := range periodOrder {
 		days := periodGroups[key]
@@ -222,6 +223,13 @@ func AggregateToPeriods(data []StockData, periodType PeriodType) []PeriodData {
 			change = fmt.Sprintf("%.2f%%", pctChange)
 		}
 
+		// Calculate HChange (close relative to previous period high)
+		hchange := ""
+		if prevPeriodHigh > 0 {
+			pctHChange := ((closeVal - prevPeriodHigh) / prevPeriodHigh) * 100
+			hchange = fmt.Sprintf("%.2f%%", pctHChange)
+		}
+
 		period := PeriodData{
 			Period:    key,
 			StartDate: firstDay.Date,
@@ -232,6 +240,7 @@ func AggregateToPeriods(data []StockData, periodType PeriodType) []PeriodData {
 			Close:     lastDay.Close,
 			Volume:    formatVolumeFloat(totalVolume),
 			Change:    change,
+			HChange:   hchange,
 			PE:        lastDay.PE,
 			Days:      len(days),
 			Drop2Pct:  DropCount{Close: drop2C, Low: drop2L},
@@ -242,6 +251,7 @@ func AggregateToPeriods(data []StockData, periodType PeriodType) []PeriodData {
 
 		result = append(result, period)
 		prevPeriodClose = closeVal
+		prevPeriodHigh = highVal
 	}
 
 	// Reverse so newest is first (consistent with daily output)
@@ -308,24 +318,24 @@ func WritePeriodCSV(data []PeriodData, filename string, includePE bool) error {
 
 	// Drop columns now show C/L (Close-based/Low-based)
 	if includePE {
-		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%"}); err != nil {
+		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%"}); err != nil {
 			return err
 		}
 		for _, d := range data {
 			if err := writer.Write([]string{
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE,
+				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE,
 				strconv.Itoa(d.Days), d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String(),
 			}); err != nil {
 				return err
 			}
 		}
 	} else {
-		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%"}); err != nil {
+		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%"}); err != nil {
 			return err
 		}
 		for _, d := range data {
 			if err := writer.Write([]string{
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change,
+				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange,
 				strconv.Itoa(d.Days), d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String(),
 			}); err != nil {
 				return err
@@ -359,21 +369,21 @@ func WritePeriodTable(data []PeriodData, filename string, includePE bool) error 
 
 	// Drop columns show C/L (Close-based/Low-based)
 	if includePE {
-		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
-		_, _ = fmt.Fprintln(file, strings.Repeat("-", 152))
+		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5s %7s %7s %7s %7s\n",
+			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
+		_, _ = fmt.Fprintln(file, strings.Repeat("-", 162))
 		for _, d := range data {
-			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %7s %7s %7s %7s\n",
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE,
+			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5d %7s %7s %7s %7s\n",
+				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE,
 				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
 		}
 	} else {
-		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
-		_, _ = fmt.Fprintln(file, strings.Repeat("-", 142))
+		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s\n",
+			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
+		_, _ = fmt.Fprintln(file, strings.Repeat("-", 152))
 		for _, d := range data {
-			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5d %7s %7s %7s %7s\n",
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change,
+			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %7s %7s %7s %7s\n",
+				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange,
 				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
 		}
 	}
@@ -385,27 +395,27 @@ func WritePeriodTable(data []PeriodData, filename string, includePE bool) error 
 func PrintPeriodPreview(data []PeriodData, count int, includePE bool) {
 	// Drop columns show C/L (Close-based/Low-based)
 	if includePE {
+		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5s %7s %7s %7s %7s\n",
+			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
+		fmt.Println(strings.Repeat("-", 162))
+		for i, d := range data {
+			if i >= count {
+				break
+			}
+			fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5d %7s %7s %7s %7s\n",
+				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE,
+				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
+		}
+	} else {
 		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
+			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
 		fmt.Println(strings.Repeat("-", 152))
 		for i, d := range data {
 			if i >= count {
 				break
 			}
 			fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %7s %7s %7s %7s\n",
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE,
-				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
-		}
-	} else {
-		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
-		fmt.Println(strings.Repeat("-", 142))
-		for i, d := range data {
-			if i >= count {
-				break
-			}
-			fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5d %7s %7s %7s %7s\n",
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change,
+				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange,
 				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
 		}
 	}
