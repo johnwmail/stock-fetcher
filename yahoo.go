@@ -28,6 +28,11 @@ func NewYahooFetcher() *YahooFetcher {
 type YahooChartResponse struct {
 	Chart struct {
 		Result []struct {
+			Meta struct {
+				LongName  string `json:"longName"`
+				ShortName string `json:"shortName"`
+				Symbol    string `json:"symbol"`
+			} `json:"meta"`
 			Timestamp  []int64 `json:"timestamp"`
 			Indicators struct {
 				Quote []struct {
@@ -50,7 +55,9 @@ type YahooChartResponse struct {
 }
 
 // FetchHistoricalData fetches historical data from Yahoo Finance using the chart API
-func (f *YahooFetcher) FetchHistoricalData(symbol string, startDate, endDate time.Time) ([]StockData, error) {
+// FetchHistoricalData fetches historical data from Yahoo Finance using the chart API
+// Returns: data, companyName, error
+func (f *YahooFetcher) FetchHistoricalData(symbol string, startDate, endDate time.Time) ([]StockData, string, error) {
 	period1 := startDate.Unix()
 	period2 := endDate.Unix()
 
@@ -64,7 +71,7 @@ func (f *YahooFetcher) FetchHistoricalData(symbol string, startDate, endDate tim
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -72,33 +79,40 @@ func (f *YahooFetcher) FetchHistoricalData(symbol string, startDate, endDate tim
 
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, "", fmt.Errorf("request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body[:min(500, len(body))]))
+		return nil, "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body[:min(500, len(body))]))
 	}
 
 	var chartResp YahooChartResponse
 	if err := json.Unmarshal(body, &chartResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	if chartResp.Chart.Error != nil {
-		return nil, fmt.Errorf("API error: %s - %s", chartResp.Chart.Error.Code, chartResp.Chart.Error.Description)
+		return nil, "", fmt.Errorf("API error: %s - %s", chartResp.Chart.Error.Code, chartResp.Chart.Error.Description)
 	}
 
 	if len(chartResp.Chart.Result) == 0 {
-		return nil, fmt.Errorf("no data returned for symbol %s", symbol)
+		return nil, "", fmt.Errorf("no data returned for symbol %s", symbol)
 	}
 
-	return parseYahooChartData(chartResp)
+	// Get company name from meta
+	companyName := chartResp.Chart.Result[0].Meta.LongName
+	if companyName == "" {
+		companyName = chartResp.Chart.Result[0].Meta.ShortName
+	}
+
+	data, err := parseYahooChartData(chartResp)
+	return data, companyName, err
 }
 
 // parseYahooChartData converts Yahoo chart response to StockData

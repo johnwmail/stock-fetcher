@@ -244,18 +244,19 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, string, error)
 }
 
 // fetchHKStock fetches HK stock data from Yahoo (no P/E)
-func fetchHKStock(symbol string, days int) ([]StockData, error) {
+// Returns: data, companyName, error
+func fetchHKStock(symbol string, days int) ([]StockData, string, error) {
 	fetcher := NewYahooFetcher()
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, 0, -days)
 
-	yahooData, err := fetcher.FetchHistoricalData(symbol, startDate, endDate)
+	yahooData, companyName, err := fetcher.FetchHistoricalData(symbol, startDate, endDate)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// Reverse so newest is first
-	return reverseData(yahooData), nil
+	return reverseData(yahooData), companyName, nil
 }
 
 // formatCompanyName formats the company slug for display
@@ -467,8 +468,7 @@ func main() {
 	if useYahoo {
 		// Use Yahoo Finance (no P/E)
 		fmt.Printf("Fetching %d days of data for %s from Yahoo Finance...\n", *days, strings.ToUpper(*symbol))
-		data, err = fetchHKStock(*symbol, *days)
-		companyName = strings.ToUpper(*symbol) // Yahoo doesn't provide company name
+		data, companyName, err = fetchHKStock(*symbol, *days)
 	} else {
 		// Use macrotrends (with P/E)
 		fmt.Printf("Fetching %d days of data for %s from macrotrends.net...\n", *days, strings.ToUpper(*symbol))

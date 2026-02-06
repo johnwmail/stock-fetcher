@@ -62,6 +62,11 @@ func TestParseYahooChartData(t *testing.T) {
 	// Test with valid data
 	resp := YahooChartResponse{}
 	resp.Chart.Result = []struct {
+		Meta struct {
+			LongName  string `json:"longName"`
+			ShortName string `json:"shortName"`
+			Symbol    string `json:"symbol"`
+		} `json:"meta"`
 		Timestamp  []int64 `json:"timestamp"`
 		Indicators struct {
 			Quote []struct {
@@ -132,6 +137,11 @@ func TestParseYahooChartData(t *testing.T) {
 func TestParseYahooChartData_EmptyQuote(t *testing.T) {
 	resp := YahooChartResponse{}
 	resp.Chart.Result = []struct {
+		Meta struct {
+			LongName  string `json:"longName"`
+			ShortName string `json:"shortName"`
+			Symbol    string `json:"symbol"`
+		} `json:"meta"`
 		Timestamp  []int64 `json:"timestamp"`
 		Indicators struct {
 			Quote []struct {
