@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  stock-fetcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stock-fetcher:latest
+    container_name: stock-fetcher
+    ports:
+      - "8000:8080"
+    environment:
+      - PORT=8080
+      - TZ=UTC
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
