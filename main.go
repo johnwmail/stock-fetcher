@@ -176,12 +176,12 @@ func reverseData(data []StockData) []StockData {
 func fetchUSStock(symbol string, days int) ([]StockData, float64, error) {
 	fetcher := NewMacrotrendsFetcher()
 
-	// Get TTM EPS for P/E calculation
+	// Get historical EPS data for P/E calculation
 	peData, err := fetcher.FetchPERatio(symbol)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to fetch P/E data: %w", err)
 	}
-	ttmEPS := peData.GetLatestTTM_EPS()
+	latestEPS := peData.GetLatestTTM_EPS()
 
 	// Get daily prices
 	prices, err := fetcher.FetchDailyPrices(symbol, days)
@@ -206,10 +206,11 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, error) {
 			change = fmt.Sprintf("%.2f%%", pctChange)
 		}
 
-		// Calculate P/E
+		// Calculate P/E using historical EPS for this date
 		pe := ""
-		if ttmEPS > 0 {
-			pe = fmt.Sprintf("%.2f", close/ttmEPS)
+		historicalEPS := peData.GetEPSForDate(p.Date)
+		if historicalEPS > 0 {
+			pe = fmt.Sprintf("%.2f", close/historicalEPS)
 		}
 
 		data = append(data, StockData{
@@ -227,7 +228,7 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, error) {
 	}
 
 	// Reverse so newest is first
-	return reverseData(data), ttmEPS, nil
+	return reverseData(data), latestEPS, nil
 }
 
 // fetchHKStock fetches HK stock data from Yahoo (no P/E)

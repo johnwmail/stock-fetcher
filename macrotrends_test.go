@@ -161,3 +161,97 @@ func TestFundamentalDataStruct(t *testing.T) {
 		t.Errorf("HistoricalData length = %d, want 1", len(data.HistoricalData))
 	}
 }
+
+func TestGetEPSForDate(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     *FundamentalData
+		date     string
+		expected float64
+	}{
+		{
+			name:     "empty historical data",
+			data:     &FundamentalData{HistoricalData: []PERatioData{}},
+			date:     "2024-01-15",
+			expected: 0,
+		},
+		{
+			name: "date before all data",
+			data: &FundamentalData{
+				HistoricalData: []PERatioData{
+					{Date: "2024-01-01", EPS: 5.0},
+					{Date: "2024-04-01", EPS: 5.5},
+				},
+			},
+			date:     "2023-06-15",
+			expected: 0,
+		},
+		{
+			name: "date in first quarter",
+			data: &FundamentalData{
+				HistoricalData: []PERatioData{
+					{Date: "2024-01-01", EPS: 5.0},
+					{Date: "2024-04-01", EPS: 5.5},
+					{Date: "2024-07-01", EPS: 6.0},
+				},
+			},
+			date:     "2024-02-15",
+			expected: 5.0,
+		},
+		{
+			name: "date in second quarter",
+			data: &FundamentalData{
+				HistoricalData: []PERatioData{
+					{Date: "2024-01-01", EPS: 5.0},
+					{Date: "2024-04-01", EPS: 5.5},
+					{Date: "2024-07-01", EPS: 6.0},
+				},
+			},
+			date:     "2024-05-15",
+			expected: 5.5,
+		},
+		{
+			name: "date after all data - use latest",
+			data: &FundamentalData{
+				HistoricalData: []PERatioData{
+					{Date: "2024-01-01", EPS: 5.0},
+					{Date: "2024-04-01", EPS: 5.5},
+				},
+			},
+			date:     "2024-12-15",
+			expected: 5.5,
+		},
+		{
+			name: "exact date match",
+			data: &FundamentalData{
+				HistoricalData: []PERatioData{
+					{Date: "2024-01-01", EPS: 5.0},
+					{Date: "2024-04-01", EPS: 5.5},
+				},
+			},
+			date:     "2024-04-01",
+			expected: 5.5,
+		},
+		{
+			name: "skip zero EPS entries",
+			data: &FundamentalData{
+				HistoricalData: []PERatioData{
+					{Date: "2024-01-01", EPS: 5.0},
+					{Date: "2024-04-01", EPS: 0},
+					{Date: "2024-07-01", EPS: 6.0},
+				},
+			},
+			date:     "2024-05-15",
+			expected: 5.0, // Uses Q1 since Q2 has zero EPS
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.data.GetEPSForDate(tt.date)
+			if result != tt.expected {
+				t.Errorf("GetEPSForDate(%q) = %v, want %v", tt.date, result, tt.expected)
+			}
+		})
+	}
+}

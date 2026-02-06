@@ -301,4 +301,25 @@ func (data *FundamentalData) GetLatestTTM_EPS() float64 {
 	return 0
 }
 
+// GetEPSForDate returns the TTM EPS that was valid on a given date
+// It finds the most recent EPS data point on or before the given date
+func (data *FundamentalData) GetEPSForDate(date string) float64 {
+	if len(data.HistoricalData) == 0 {
+		return 0
+	}
+
+	// Historical data is sorted oldest to newest
+	// Find the last entry with date <= target date
+	var eps float64
+	for _, d := range data.HistoricalData {
+		if d.Date <= date && d.EPS > 0 {
+			eps = d.EPS
+		}
+		if d.Date > date {
+			break
+		}
+	}
+	return eps
+}
+
 
