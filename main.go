@@ -174,20 +174,22 @@ func reverseData(data []StockData) []StockData {
 }
 
 // fetchUSStock fetches US stock data from macrotrends (with P/E)
-func fetchUSStock(symbol string, days int) ([]StockData, float64, error) {
+// Returns: data, latestEPS, companyName, error
+func fetchUSStock(symbol string, days int) ([]StockData, float64, string, error) {
 	fetcher := NewMacrotrendsFetcher()
 
 	// Get historical EPS data for P/E calculation
 	peData, err := fetcher.FetchPERatio(symbol)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to fetch P/E data: %w", err)
+		return nil, 0, "", fmt.Errorf("failed to fetch P/E data: %w", err)
 	}
 	latestEPS := peData.GetLatestTTM_EPS()
+	companyName := peData.CompanyName
 
 	// Get daily prices
 	prices, err := fetcher.FetchDailyPrices(symbol, days)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to fetch price data: %w", err)
+		return nil, 0, "", fmt.Errorf("failed to fetch price data: %w", err)
 	}
 
 	// Convert to StockData with P/E (calculate change from old to new first)
@@ -238,7 +240,7 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, error) {
 	}
 
 	// Reverse so newest is first
-	return reverseData(data), latestEPS, nil
+	return reverseData(data), latestEPS, companyName, nil
 }
 
 // fetchHKStock fetches HK stock data from Yahoo (no P/E)
@@ -254,6 +256,23 @@ func fetchHKStock(symbol string, days int) ([]StockData, error) {
 
 	// Reverse so newest is first
 	return reverseData(yahooData), nil
+}
+
+// formatCompanyName formats the company slug for display
+func formatCompanyName(slug string) string {
+	if slug == "" {
+		return ""
+	}
+	// Replace dashes with spaces
+	name := strings.ReplaceAll(slug, "-", " ")
+	// Capitalize each word
+	words := strings.Fields(name)
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + strings.ToLower(w[1:])
+		}
+	}
+	return strings.Join(words, " ")
 }
 
 // getOutputExtension returns the file extension for the given format
@@ -444,14 +463,16 @@ func main() {
 	// Determine data source
 	useYahoo := isHKStock(*symbol) || *source == "yahoo"
 
+	var companyName string
 	if useYahoo {
 		// Use Yahoo Finance (no P/E)
 		fmt.Printf("Fetching %d days of data for %s from Yahoo Finance...\n", *days, strings.ToUpper(*symbol))
 		data, err = fetchHKStock(*symbol, *days)
+		companyName = strings.ToUpper(*symbol) // Yahoo doesn't provide company name
 	} else {
 		// Use macrotrends (with P/E)
 		fmt.Printf("Fetching %d days of data for %s from macrotrends.net...\n", *days, strings.ToUpper(*symbol))
-		data, ttmEPS, err = fetchUSStock(*symbol, *days)
+		data, ttmEPS, companyName, err = fetchUSStock(*symbol, *days)
 		includePE = true
 	}
 
@@ -465,7 +486,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Received %d daily records\n", len(data))
+	// Format company name for display
+	companyName = formatCompanyName(companyName)
+
+	fmt.Printf("Received %d daily records for %s\n", len(data), companyName)
 	if includePE && ttmEPS > 0 {
 		fmt.Printf("TTM EPS: $%.2f\n", ttmEPS)
 	}
