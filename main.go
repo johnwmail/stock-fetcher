@@ -389,7 +389,8 @@ func printUsage() {
 	fmt.Println("Stock Price Fetcher - Fetch historical stock data with P/E ratio")
 	fmt.Println()
 	fmt.Println("Usage:")
-	fmt.Println("  stock-fetcher -s <SYMBOL> [options]")
+	fmt.Println("  stock-fetcher -s <SYMBOL> [options]    # CLI mode")
+	fmt.Println("  stock-fetcher -serve [port]            # Web server mode")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  stock-fetcher -s AAPL                # US stock, 3 years, with P/E")
@@ -400,6 +401,8 @@ func printUsage() {
 	fmt.Println("  stock-fetcher -s AAPL -p monthly     # Monthly aggregated report")
 	fmt.Println("  stock-fetcher -l sp                  # List S&P 500 symbols")
 	fmt.Println("  stock-fetcher -l hk                  # List Hang Seng symbols")
+	fmt.Println("  stock-fetcher -serve                 # Start web server on port 8080")
+	fmt.Println("  stock-fetcher -serve 3000            # Start web server on port 3000")
 	fmt.Println()
 	fmt.Println("Options:")
 	fmt.Println("  -s, -sym, -symbol     Stock symbol (e.g., MSFT, AAPL, 0700.HK)")
@@ -411,6 +414,7 @@ func printUsage() {
 	fmt.Println("  -l, -list             List index: sp500/sp, dow, nasdaq100/nasdaq, hangseng/hk, all")
 	fmt.Println("  -format               Output format: csv, json, table (default: table)")
 	fmt.Println("  -output               Output filename (default: <SYMBOL>_historical.csv)")
+	fmt.Println("  -serve                Start web server (default port: 8080)")
 	fmt.Println()
 	fmt.Println("Period Reports:")
 	fmt.Println("  Period reports aggregate daily data and include drop day counts:")
@@ -424,6 +428,22 @@ func printUsage() {
 	fmt.Println("  yahoo        - Default for HK stocks (no P/E)")
 }
 
+// handleServeMode starts the web server
+func handleServeMode() {
+	port := "8080"
+	if flag.NArg() > 0 {
+		port = flag.Arg(0)
+	}
+	// Also check PORT env var (for container deployments)
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		port = envPort
+	}
+	if err := runServer(port); err != nil {
+		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
 func main() {
 	// Main flags
 	symbol := flag.String("symbol", "", "Stock symbol (e.g., MSFT, AAPL, 0700.HK)")
@@ -433,6 +453,7 @@ func main() {
 	source := flag.String("source", "", "Data source: macrotrends (with P/E) or yahoo (no P/E)")
 	listIndex := flag.String("list", "", "List symbols: sp500, dow, nasdaq100, hangseng, or 'all'")
 	period := flag.String("period", "", "Period aggregation: weekly, monthly, quarterly, yearly")
+	serve := flag.Bool("serve", false, "Start web server")
 
 	// Short aliases
 	flag.StringVar(symbol, "s", "", "Alias for -symbol")
@@ -445,6 +466,12 @@ func main() {
 	flag.StringVar(source, "src", "", "Alias for -source")
 
 	flag.Parse()
+
+	// Handle serve mode
+	if *serve {
+		handleServeMode()
+		return
+	}
 
 	// Handle source aliases
 	if *yahooSource {
