@@ -126,8 +126,18 @@ done
 
 | Stock Type | Source | P/E Ratio |
 |------------|--------|----------|
-| US Stocks | macrotrends.net | ✅ Yes (TTM) |
+| US Stocks | macrotrends.net | ✅ Yes (TTM, historical) |
 | HK Stocks (.HK) | Yahoo Finance | ❌ No |
+
+### P/E Ratio Data Availability
+
+P/E ratios are calculated using historical TTM EPS data from macrotrends.net. The EPS data availability varies by company:
+
+- Most companies have EPS data starting from 2010-2012
+- For dates before the first available EPS, P/E will be empty
+- Example: MSFT EPS data starts from 2011-12-31
+
+This is a data source limitation, not a calculation error.
 
 ## Supported Indices
 
