@@ -256,18 +256,28 @@ func printUsage() {
 	fmt.Println("  stock-fetcher -s AAPL -d 30          # US stock, 30 days")
 	fmt.Println("  stock-fetcher -s AAPL -y             # US stock, use Yahoo (no P/E)")
 	fmt.Println("  stock-fetcher -s 0700.HK             # HK stock (Yahoo, no P/E)")
+	fmt.Println("  stock-fetcher -s AAPL -p weekly      # Weekly aggregated report")
+	fmt.Println("  stock-fetcher -s AAPL -p monthly     # Monthly aggregated report")
 	fmt.Println("  stock-fetcher -l sp                  # List S&P 500 symbols")
 	fmt.Println("  stock-fetcher -l hk                  # List Hang Seng symbols")
 	fmt.Println()
 	fmt.Println("Options:")
 	fmt.Println("  -s, -sym, -symbol     Stock symbol (e.g., MSFT, AAPL, 0700.HK)")
 	fmt.Println("  -d, -days             Number of days (default: 1095 = 3 years)")
+	fmt.Println("  -p, -period           Period aggregation: weekly, monthly, quarterly, yearly")
 	fmt.Println("  -source, -src         Data source: macrotrends or yahoo")
 	fmt.Println("  -y                    Use Yahoo Finance (alias for -source yahoo)")
 	fmt.Println("  -m                    Use macrotrends.net (alias for -source macrotrends)")
 	fmt.Println("  -l, -list             List index: sp500/sp, dow, nasdaq100/nasdaq, hangseng/hk, all")
 	fmt.Println("  -format               Output format: csv, json, table (default: csv)")
 	fmt.Println("  -output               Output filename (default: <SYMBOL>_historical.csv)")
+	fmt.Println()
+	fmt.Println("Period Reports:")
+	fmt.Println("  Period reports aggregate daily data and include drop day counts:")
+	fmt.Println("  - Drop2%: Days with 2-3% price drop")
+	fmt.Println("  - Drop3%: Days with 3-4% price drop")
+	fmt.Println("  - Drop4%: Days with 4-5% price drop")
+	fmt.Println("  - Drop5%: Days with 5%+ price drop")
 	fmt.Println()
 	fmt.Println("Data Sources:")
 	fmt.Println("  macrotrends  - Default for US stocks (includes P/E ratio)")
@@ -282,12 +292,14 @@ func main() {
 	format := flag.String("format", "csv", "Output format: csv, json, or table")
 	source := flag.String("source", "", "Data source: macrotrends (with P/E) or yahoo (no P/E)")
 	listIndex := flag.String("list", "", "List symbols: sp500, dow, nasdaq100, hangseng, or 'all'")
+	period := flag.String("period", "", "Period aggregation: weekly, monthly, quarterly, yearly")
 
 	// Short aliases
 	flag.StringVar(symbol, "s", "", "Alias for -symbol")
 	flag.StringVar(symbol, "sym", "", "Alias for -symbol")
 	flag.IntVar(days, "d", 1095, "Alias for -days")
 	flag.StringVar(listIndex, "l", "", "Alias for -list")
+	flag.StringVar(period, "p", "", "Alias for -period")
 	yahooSource := flag.Bool("y", false, "Use Yahoo Finance as data source (alias for -source yahoo)")
 	macroSource := flag.Bool("m", false, "Use macrotrends as data source (alias for -source macrotrends)")
 	flag.StringVar(source, "src", "", "Alias for -source")
@@ -312,6 +324,17 @@ func main() {
 		return
 	}
 
+	// Parse period type if specified
+	var periodType PeriodType
+	if *period != "" {
+		var err error
+		periodType, err = ParsePeriodType(*period)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	// Set default output filename
 	if *output == "" {
 		ext := "csv"
@@ -321,7 +344,11 @@ func main() {
 		case "table":
 			ext = "txt"
 		}
-		*output = fmt.Sprintf("%s_historical.%s", strings.ToUpper(*symbol), ext)
+		if *period != "" {
+			*output = fmt.Sprintf("%s_%s.%s", strings.ToUpper(*symbol), *period, ext)
+		} else {
+			*output = fmt.Sprintf("%s_historical.%s", strings.ToUpper(*symbol), ext)
+		}
 	}
 
 	var data []StockData
@@ -353,12 +380,54 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Received %d records\n", len(data))
+	fmt.Printf("Received %d daily records\n", len(data))
 	if includePE && ttmEPS > 0 {
 		fmt.Printf("TTM EPS: $%.2f\n", ttmEPS)
 	}
 
-	// Write output
+	// Handle period aggregation
+	if *period != "" {
+		// Data is newest-first, but AggregateToPeriods expects oldest-first
+		reversedData := reverseData(data)
+		periodData := AggregateToPeriods(reversedData, periodType)
+
+		if len(periodData) == 0 {
+			fmt.Println("No period data generated.")
+			os.Exit(1)
+		}
+
+		fmt.Printf("Aggregated into %d %s periods\n", len(periodData), *period)
+
+		// Write period output
+		switch *format {
+		case "json":
+			if !strings.HasSuffix(*output, ".json") {
+				*output = strings.TrimSuffix(*output, ".csv") + ".json"
+			}
+			err = WritePeriodJSON(periodData, *output)
+		case "table":
+			if !strings.HasSuffix(*output, ".txt") {
+				*output = strings.TrimSuffix(*output, ".csv") + ".txt"
+			}
+			err = WritePeriodTable(periodData, *output, includePE)
+		default:
+			err = WritePeriodCSV(periodData, *output, includePE)
+		}
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Data saved to %s\n", *output)
+
+		// Show preview
+		fmt.Println("\nPreview (first 5 periods):")
+		PrintPeriodPreview(periodData, 5, includePE)
+		return
+	}
+
+	// Write daily output
 	switch *format {
 	case "json":
 		if !strings.HasSuffix(*output, ".json") {
