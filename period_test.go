@@ -362,8 +362,8 @@ func TestWritePeriodCSV(t *testing.T) {
 
 			// Check that drop columns exist
 			header := strings.Join(records[0], ",")
-			if !strings.Contains(header, "Drop2%") {
-				t.Error("Header missing Drop2%")
+			if !strings.Contains(header, "C/L-2%") {
+				t.Error("Header missing C/L-2%")
 			}
 		})
 	}
@@ -442,11 +442,11 @@ func TestWritePeriodTable(t *testing.T) {
 	contentStr := string(content)
 
 	// Check for expected content
-	if !strings.Contains(contentStr, "D2%") {
-		t.Error("Table missing D2% header")
+	if !strings.Contains(contentStr, "C/L-2%") {
+		t.Error("Table missing C/L-2% header")
 	}
-	if !strings.Contains(contentStr, "D5%") {
-		t.Error("Table missing D5% header")
+	if !strings.Contains(contentStr, "C/L-5%") {
+		t.Error("Table missing C/L-5% header")
 	}
 	if !strings.Contains(contentStr, "2024-01") {
 		t.Error("Table missing period data")

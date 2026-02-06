@@ -308,7 +308,7 @@ func WritePeriodCSV(data []PeriodData, filename string, includePE bool) error {
 
 	// Drop columns now show C/L (Close-based/Low-based)
 	if includePE {
-		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "Drop2%(C/L)", "Drop3%(C/L)", "Drop4%(C/L)", "Drop5%(C/L)"}); err != nil {
+		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%"}); err != nil {
 			return err
 		}
 		for _, d := range data {
@@ -320,7 +320,7 @@ func WritePeriodCSV(data []PeriodData, filename string, includePE bool) error {
 			}
 		}
 	} else {
-		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "Drop2%(C/L)", "Drop3%(C/L)", "Drop4%(C/L)", "Drop5%(C/L)"}); err != nil {
+		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%"}); err != nil {
 			return err
 		}
 		for _, d := range data {
@@ -360,7 +360,7 @@ func WritePeriodTable(data []PeriodData, filename string, includePE bool) error 
 	// Drop columns show C/L (Close-based/Low-based)
 	if includePE {
 		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "D2%", "D3%", "D4%", "D5%")
+			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
 		_, _ = fmt.Fprintln(file, strings.Repeat("-", 152))
 		for _, d := range data {
 			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %7s %7s %7s %7s\n",
@@ -369,7 +369,7 @@ func WritePeriodTable(data []PeriodData, filename string, includePE bool) error 
 		}
 	} else {
 		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "D2%", "D3%", "D4%", "D5%")
+			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
 		_, _ = fmt.Fprintln(file, strings.Repeat("-", 142))
 		for _, d := range data {
 			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5d %7s %7s %7s %7s\n",
@@ -386,7 +386,7 @@ func PrintPeriodPreview(data []PeriodData, count int, includePE bool) {
 	// Drop columns show C/L (Close-based/Low-based)
 	if includePE {
 		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "D2%", "D3%", "D4%", "D5%")
+			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
 		fmt.Println(strings.Repeat("-", 152))
 		for i, d := range data {
 			if i >= count {
@@ -398,7 +398,7 @@ func PrintPeriodPreview(data []PeriodData, count int, includePE bool) {
 		}
 	} else {
 		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "D2%", "D3%", "D4%", "D5%")
+			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
 		fmt.Println(strings.Repeat("-", 142))
 		for i, d := range data {
 			if i >= count {
