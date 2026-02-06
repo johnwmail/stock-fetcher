@@ -11,6 +11,10 @@
         .loading { opacity: 0.5; pointer-events: none; }
         .table-container { max-height: 500px; overflow-y: auto; }
         .sticky-header th { position: sticky; top: 0; background: #1f2937; z-index: 10; }
+        /* Hide chart on mobile/small screens */
+        @media (max-width: 768px) {
+            .chart-section { display: none !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
@@ -105,8 +109,8 @@
                 </div>
             </div>
 
-            <!-- Chart -->
-            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <!-- Chart (hidden on mobile) -->
+            <div id="chartSection" class="chart-section bg-gray-800 rounded-lg p-6 mb-6">
                 <canvas id="priceChart" height="300"></canvas>
             </div>
 

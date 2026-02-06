@@ -172,8 +172,18 @@ function buildTable(records, isDaily, hasPE) {
     });
 }
 
+// Check if we should show chart (not on mobile/small screens)
+function shouldShowChart() {
+    return window.innerWidth > 768;
+}
+
 // Build price chart
 function buildChart(records, isDaily, symbol) {
+    // Skip chart rendering on mobile/small screens
+    if (!shouldShowChart()) {
+        return;
+    }
+
     const ctx = document.getElementById('priceChart').getContext('2d');
 
     // Destroy existing chart
