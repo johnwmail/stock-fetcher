@@ -11,23 +11,34 @@ import (
 	"time"
 )
 
+// DropCount holds both Close-based and Low-based drop counts
+type DropCount struct {
+	Close int `json:"close"` // Count based on (Close - PrevClose) / PrevClose
+	Low   int `json:"low"`   // Count based on (Low - PrevClose) / PrevClose
+}
+
+// String returns the drop count in "C/L" format
+func (d DropCount) String() string {
+	return fmt.Sprintf("%d/%d", d.Close, d.Low)
+}
+
 // PeriodData represents aggregated data for a period (week, month, quarter, year)
 type PeriodData struct {
-	Period    string `json:"period"`     // Period label (e.g., "2024-W01", "2024-01", "2024-Q1", "2024")
-	StartDate string `json:"start_date"` // First trading day in period
-	EndDate   string `json:"end_date"`   // Last trading day in period
-	Open      string `json:"open"`       // Open price of first day
-	High      string `json:"high"`       // Highest price in period
-	Low       string `json:"low"`        // Lowest price in period
-	Close     string `json:"close"`      // Close price of last day
-	Volume    string `json:"volume"`     // Total volume in period
-	Change    string `json:"change"`     // Period change percentage
-	PE        string `json:"pe,omitempty"`
-	Days      int    `json:"days"`       // Number of trading days
-	Drop2Pct  int    `json:"drop_2pct"`  // Days with 2-3% drop
-	Drop3Pct  int    `json:"drop_3pct"`  // Days with 3-4% drop
-	Drop4Pct  int    `json:"drop_4pct"`  // Days with 4-5% drop
-	Drop5Pct  int    `json:"drop_5pct"`  // Days with 5%+ drop
+	Period    string    `json:"period"`     // Period label (e.g., "2024-W01", "2024-01", "2024-Q1", "2024")
+	StartDate string    `json:"start_date"` // First trading day in period
+	EndDate   string    `json:"end_date"`   // Last trading day in period
+	Open      string    `json:"open"`       // Open price of first day
+	High      string    `json:"high"`       // Highest price in period
+	Low       string    `json:"low"`        // Lowest price in period
+	Close     string    `json:"close"`      // Close price of last day
+	Volume    string    `json:"volume"`     // Total volume in period
+	Change    string    `json:"change"`     // Period change percentage
+	PE        string    `json:"pe,omitempty"`
+	Days      int       `json:"days"`       // Number of trading days
+	Drop2Pct  DropCount `json:"drop_2pct"`  // Days with 2-3% drop (C/L)
+	Drop3Pct  DropCount `json:"drop_3pct"`  // Days with 3-4% drop (C/L)
+	Drop4Pct  DropCount `json:"drop_4pct"`  // Days with 4-5% drop (C/L)
+	Drop5Pct  DropCount `json:"drop_5pct"`  // Days with 5%+ drop (C/L)
 }
 
 // PeriodType represents the type of period aggregation
@@ -74,23 +85,16 @@ func getPeriodKey(date time.Time, periodType PeriodType) string {
 	}
 }
 
-// classifyDrop returns which drop bucket a change percentage falls into
+// classifyDropPct returns which drop bucket a percentage change falls into
 // Returns 0 if no significant drop, or 2, 3, 4, 5 for the drop bucket
-func classifyDrop(changeStr string) int {
-	// Parse change string like "-2.50%" or "1.5%"
-	changeStr = strings.TrimSuffix(changeStr, "%")
-	change, err := strconv.ParseFloat(changeStr, 64)
-	if err != nil {
-		return 0
-	}
-
+func classifyDropPct(pctChange float64) int {
 	// Only count negative changes (drops)
-	if change >= 0 {
+	if pctChange >= 0 {
 		return 0
 	}
 
 	// Use absolute value for comparison
-	absChange := -change
+	absChange := -pctChange
 
 	// Classify into exclusive buckets (largest drop wins)
 	if absChange >= 5.0 {
@@ -104,6 +108,35 @@ func classifyDrop(changeStr string) int {
 	}
 
 	return 0
+}
+
+// calculateDrops calculates both Close-based and Low-based drop percentages
+// Returns (closeDrop, lowDrop) bucket classifications
+func calculateDrops(close, low, prevClose float64) (int, int) {
+	if prevClose <= 0 {
+		return 0, 0
+	}
+
+	// C = (Close - PrevClose) / PrevClose * 100
+	closePct := ((close - prevClose) / prevClose) * 100
+	// L = (Low - PrevClose) / PrevClose * 100
+	lowPct := ((low - prevClose) / prevClose) * 100
+
+	return classifyDropPct(closePct), classifyDropPct(lowPct)
+}
+
+// incrementDropCount increments the appropriate drop counter based on bucket
+func incrementDropCount(bucket int, drop2, drop3, drop4, drop5 *int) {
+	switch bucket {
+	case 2:
+		*drop2++
+	case 3:
+		*drop3++
+	case 4:
+		*drop4++
+	case 5:
+		*drop5++
+	}
 }
 
 // AggregateToPeriods converts daily stock data into period aggregates
@@ -154,11 +187,14 @@ func AggregateToPeriods(data []StockData, periodType PeriodType) []PeriodData {
 
 		var highVal, lowVal float64
 		var totalVolume float64
-		var drop2, drop3, drop4, drop5 int
+		var drop2C, drop3C, drop4C, drop5C int // Close-based drops
+		var drop2L, drop3L, drop4L, drop5L int // Low-based drops
+		var dayPrevClose float64 // Track previous day's close for drop calculation
 
 		for i, d := range days {
 			high := parseFloat(d.High)
 			low := parseFloat(d.Low)
+			close := parseFloat(d.Close)
 			vol := parseVolume(d.Volume)
 
 			if i == 0 || high > highVal {
@@ -169,17 +205,13 @@ func AggregateToPeriods(data []StockData, periodType PeriodType) []PeriodData {
 			}
 			totalVolume += vol
 
-			// Classify drop
-			switch classifyDrop(d.Change) {
-			case 2:
-				drop2++
-			case 3:
-				drop3++
-			case 4:
-				drop4++
-			case 5:
-				drop5++
+			// Calculate drops using previous day's close
+			if dayPrevClose > 0 {
+				closeDrop, lowDrop := calculateDrops(close, low, dayPrevClose)
+				incrementDropCount(closeDrop, &drop2C, &drop3C, &drop4C, &drop5C)
+				incrementDropCount(lowDrop, &drop2L, &drop3L, &drop4L, &drop5L)
 			}
+			dayPrevClose = close
 		}
 
 		// Calculate period change
@@ -202,10 +234,10 @@ func AggregateToPeriods(data []StockData, periodType PeriodType) []PeriodData {
 			Change:    change,
 			PE:        lastDay.PE,
 			Days:      len(days),
-			Drop2Pct:  drop2,
-			Drop3Pct:  drop3,
-			Drop4Pct:  drop4,
-			Drop5Pct:  drop5,
+			Drop2Pct:  DropCount{Close: drop2C, Low: drop2L},
+			Drop3Pct:  DropCount{Close: drop3C, Low: drop3L},
+			Drop4Pct:  DropCount{Close: drop4C, Low: drop4L},
+			Drop5Pct:  DropCount{Close: drop5C, Low: drop5L},
 		}
 
 		result = append(result, period)
@@ -274,26 +306,27 @@ func WritePeriodCSV(data []PeriodData, filename string, includePE bool) error {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
+	// Drop columns now show C/L (Close-based/Low-based)
 	if includePE {
-		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "Drop2%", "Drop3%", "Drop4%", "Drop5%"}); err != nil {
+		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "Drop2%(C/L)", "Drop3%(C/L)", "Drop4%(C/L)", "Drop5%(C/L)"}); err != nil {
 			return err
 		}
 		for _, d := range data {
 			if err := writer.Write([]string{
 				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE,
-				strconv.Itoa(d.Days), strconv.Itoa(d.Drop2Pct), strconv.Itoa(d.Drop3Pct), strconv.Itoa(d.Drop4Pct), strconv.Itoa(d.Drop5Pct),
+				strconv.Itoa(d.Days), d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String(),
 			}); err != nil {
 				return err
 			}
 		}
 	} else {
-		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "Drop2%", "Drop3%", "Drop4%", "Drop5%"}); err != nil {
+		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "Drop2%(C/L)", "Drop3%(C/L)", "Drop4%(C/L)", "Drop5%(C/L)"}); err != nil {
 			return err
 		}
 		for _, d := range data {
 			if err := writer.Write([]string{
 				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change,
-				strconv.Itoa(d.Days), strconv.Itoa(d.Drop2Pct), strconv.Itoa(d.Drop3Pct), strconv.Itoa(d.Drop4Pct), strconv.Itoa(d.Drop5Pct),
+				strconv.Itoa(d.Days), d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String(),
 			}); err != nil {
 				return err
 			}
@@ -324,23 +357,24 @@ func WritePeriodTable(data []PeriodData, filename string, includePE bool) error 
 	}
 	defer func() { _ = file.Close() }()
 
+	// Drop columns show C/L (Close-based/Low-based)
 	if includePE {
-		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %5s %5s %5s %5s\n",
+		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s\n",
 			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "D2%", "D3%", "D4%", "D5%")
-		_, _ = fmt.Fprintln(file, strings.Repeat("-", 140))
+		_, _ = fmt.Fprintln(file, strings.Repeat("-", 152))
 		for _, d := range data {
-			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %5d %5d %5d %5d\n",
+			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %7s %7s %7s %7s\n",
 				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE,
-				d.Days, d.Drop2Pct, d.Drop3Pct, d.Drop4Pct, d.Drop5Pct)
+				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
 		}
 	} else {
-		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %5s %5s %5s %5s\n",
+		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %7s %7s %7s %7s\n",
 			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "D2%", "D3%", "D4%", "D5%")
-		_, _ = fmt.Fprintln(file, strings.Repeat("-", 130))
+		_, _ = fmt.Fprintln(file, strings.Repeat("-", 142))
 		for _, d := range data {
-			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5d %5d %5d %5d %5d\n",
+			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5d %7s %7s %7s %7s\n",
 				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change,
-				d.Days, d.Drop2Pct, d.Drop3Pct, d.Drop4Pct, d.Drop5Pct)
+				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
 		}
 	}
 
@@ -349,29 +383,30 @@ func WritePeriodTable(data []PeriodData, filename string, includePE bool) error 
 
 // PrintPeriodPreview prints a preview of period data to stdout
 func PrintPeriodPreview(data []PeriodData, count int, includePE bool) {
+	// Drop columns show C/L (Close-based/Low-based)
 	if includePE {
-		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %5s %5s %5s %5s\n",
+		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s\n",
 			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "PE", "Days", "D2%", "D3%", "D4%", "D5%")
-		fmt.Println(strings.Repeat("-", 140))
+		fmt.Println(strings.Repeat("-", 152))
 		for i, d := range data {
 			if i >= count {
 				break
 			}
-			fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %5d %5d %5d %5d\n",
+			fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %7s %7s %7s %7s\n",
 				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.PE,
-				d.Days, d.Drop2Pct, d.Drop3Pct, d.Drop4Pct, d.Drop5Pct)
+				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
 		}
 	} else {
-		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %5s %5s %5s %5s\n",
+		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5s %7s %7s %7s %7s\n",
 			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "Days", "D2%", "D3%", "D4%", "D5%")
-		fmt.Println(strings.Repeat("-", 130))
+		fmt.Println(strings.Repeat("-", 142))
 		for i, d := range data {
 			if i >= count {
 				break
 			}
-			fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5d %5d %5d %5d %5d\n",
+			fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %5d %7s %7s %7s %7s\n",
 				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change,
-				d.Days, d.Drop2Pct, d.Drop3Pct, d.Drop4Pct, d.Drop5Pct)
+				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
 		}
 	}
 }

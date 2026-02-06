@@ -77,45 +77,69 @@ func TestGetPeriodKey(t *testing.T) {
 	}
 }
 
-func TestClassifyDrop(t *testing.T) {
+func TestClassifyDropPct(t *testing.T) {
 	tests := []struct {
-		change   string
-		expected int
+		pctChange float64
+		expected  int
 	}{
 		// Positive changes - no drop
-		{"1.5%", 0},
-		{"0.0%", 0},
-		{"5.5%", 0},
+		{1.5, 0},
+		{0.0, 0},
+		{5.5, 0},
 		// Small drops - no bucket
-		{"-0.5%", 0},
-		{"-1.99%", 0},
+		{-0.5, 0},
+		{-1.99, 0},
 		// 2% bucket (2-3%)
-		{"-2.0%", 2},
-		{"-2.5%", 2},
-		{"-2.99%", 2},
+		{-2.0, 2},
+		{-2.5, 2},
+		{-2.99, 2},
 		// 3% bucket (3-4%)
-		{"-3.0%", 3},
-		{"-3.5%", 3},
-		{"-3.99%", 3},
+		{-3.0, 3},
+		{-3.5, 3},
+		{-3.99, 3},
 		// 4% bucket (4-5%)
-		{"-4.0%", 4},
-		{"-4.5%", 4},
-		{"-4.99%", 4},
+		{-4.0, 4},
+		{-4.5, 4},
+		{-4.99, 4},
 		// 5% bucket (5%+)
-		{"-5.0%", 5},
-		{"-5.5%", 5},
-		{"-10.0%", 5},
-		{"-50.0%", 5},
-		// Edge cases
-		{"", 0},
-		{"invalid", 0},
+		{-5.0, 5},
+		{-5.5, 5},
+		{-10.0, 5},
+		{-50.0, 5},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.change, func(t *testing.T) {
-			result := classifyDrop(tt.change)
-			if result != tt.expected {
-				t.Errorf("classifyDrop(%q) = %d, want %d", tt.change, result, tt.expected)
+		result := classifyDropPct(tt.pctChange)
+		if result != tt.expected {
+			t.Errorf("classifyDropPct(%.2f) = %d, want %d", tt.pctChange, result, tt.expected)
+		}
+	}
+}
+
+func TestCalculateDrops(t *testing.T) {
+	tests := []struct {
+		name        string
+		close       float64
+		low         float64
+		prevClose   float64
+		expectedC   int
+		expectedL   int
+	}{
+		{"no drop close or low", 100, 100, 100, 0, 0},
+		{"2% close drop", 98, 98, 100, 2, 2},
+		{"close flat, low 3% drop", 100, 97, 100, 0, 3},
+		{"close 2% drop, low 5% drop", 98, 95, 100, 2, 5},
+		{"5% close and low drop", 95, 93, 100, 5, 5},
+		{"zero prev close", 100, 98, 0, 0, 0},
+		{"low 2% drop only", 100, 98, 100, 0, 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			closeDrop, lowDrop := calculateDrops(tt.close, tt.low, tt.prevClose)
+			if closeDrop != tt.expectedC || lowDrop != tt.expectedL {
+				t.Errorf("calculateDrops(%.2f, %.2f, %.2f) = (%d, %d), want (%d, %d)",
+					tt.close, tt.low, tt.prevClose, closeDrop, lowDrop, tt.expectedC, tt.expectedL)
 			}
 		})
 	}
@@ -232,18 +256,23 @@ func TestAggregateToPeriods(t *testing.T) {
 		t.Errorf("Days = %d, want %d", period.Days, 5)
 	}
 
-	// Check drop counts
-	if period.Drop2Pct != 0 {
-		t.Errorf("Drop2Pct = %d, want %d", period.Drop2Pct, 0)
+	// Check drop counts (now DropCount with Close and Low)
+	// Day 2: Close=103, prevClose=104 → -0.96% (no bucket), Low=102 → -1.92% (no bucket)
+	// Day 3: Close=99, prevClose=103 → -3.88% (3% bucket), Low=98 → -4.85% (4% bucket)
+	// Day 4: Close=100, prevClose=99 → +1.01% (no drop), Low=97 → -2.02% (2% bucket)
+	// Day 5: Close=96, prevClose=100 → -4.00% (4% bucket), Low=95 → -5.00% (5% bucket)
+	// Expected: Drop2C=0 Drop2L=1, Drop3C=1 Drop3L=0, Drop4C=1 Drop4L=1, Drop5C=0 Drop5L=1
+	if period.Drop2Pct.Close != 0 || period.Drop2Pct.Low != 1 {
+		t.Errorf("Drop2Pct = %d/%d, want 0/1", period.Drop2Pct.Close, period.Drop2Pct.Low)
 	}
-	if period.Drop3Pct != 1 {
-		t.Errorf("Drop3Pct = %d, want %d", period.Drop3Pct, 1)
+	if period.Drop3Pct.Close != 1 || period.Drop3Pct.Low != 0 {
+		t.Errorf("Drop3Pct = %d/%d, want 1/0", period.Drop3Pct.Close, period.Drop3Pct.Low)
 	}
-	if period.Drop4Pct != 1 {
-		t.Errorf("Drop4Pct = %d, want %d", period.Drop4Pct, 1)
+	if period.Drop4Pct.Close != 1 || period.Drop4Pct.Low != 1 {
+		t.Errorf("Drop4Pct = %d/%d, want 1/1", period.Drop4Pct.Close, period.Drop4Pct.Low)
 	}
-	if period.Drop5Pct != 0 {
-		t.Errorf("Drop5Pct = %d, want %d", period.Drop5Pct, 0)
+	if period.Drop5Pct.Close != 0 || period.Drop5Pct.Low != 1 {
+		t.Errorf("Drop5Pct = %d/%d, want 0/1", period.Drop5Pct.Close, period.Drop5Pct.Low)
 	}
 }
 
@@ -286,7 +315,11 @@ func TestWritePeriodCSV(t *testing.T) {
 			Period: "2024-01", StartDate: "2024-01-02", EndDate: "2024-01-31",
 			Open: "100.00", High: "110.00", Low: "95.00", Close: "105.00",
 			Volume: "50M", Change: "5.00%", PE: "25.5",
-			Days: 21, Drop2Pct: 2, Drop3Pct: 1, Drop4Pct: 0, Drop5Pct: 0,
+			Days: 21,
+			Drop2Pct: DropCount{Close: 2, Low: 3},
+			Drop3Pct: DropCount{Close: 1, Low: 2},
+			Drop4Pct: DropCount{Close: 0, Low: 1},
+			Drop5Pct: DropCount{Close: 0, Low: 0},
 		},
 	}
 
@@ -345,7 +378,11 @@ func TestWritePeriodJSON(t *testing.T) {
 			Period: "2024-01", StartDate: "2024-01-02", EndDate: "2024-01-31",
 			Open: "100.00", High: "110.00", Low: "95.00", Close: "105.00",
 			Volume: "50M", Change: "5.00%",
-			Days: 21, Drop2Pct: 2, Drop3Pct: 1, Drop4Pct: 0, Drop5Pct: 0,
+			Days: 21,
+			Drop2Pct: DropCount{Close: 2, Low: 3},
+			Drop3Pct: DropCount{Close: 1, Low: 2},
+			Drop4Pct: DropCount{Close: 0, Low: 1},
+			Drop5Pct: DropCount{Close: 0, Low: 0},
 		},
 	}
 
@@ -370,8 +407,8 @@ func TestWritePeriodJSON(t *testing.T) {
 		t.Errorf("Expected 1 record, got %d", len(result))
 	}
 
-	if result[0].Drop3Pct != 1 {
-		t.Errorf("Drop3Pct = %d, want 1", result[0].Drop3Pct)
+	if result[0].Drop3Pct.Close != 1 {
+		t.Errorf("Drop3Pct.Close = %d, want 1", result[0].Drop3Pct.Close)
 	}
 }
 
@@ -383,7 +420,11 @@ func TestWritePeriodTable(t *testing.T) {
 			Period: "2024-01", StartDate: "2024-01-02", EndDate: "2024-01-31",
 			Open: "100.00", High: "110.00", Low: "95.00", Close: "105.00",
 			Volume: "50M", Change: "5.00%", PE: "25.5",
-			Days: 21, Drop2Pct: 2, Drop3Pct: 1, Drop4Pct: 0, Drop5Pct: 0,
+			Days: 21,
+			Drop2Pct: DropCount{Close: 2, Low: 3},
+			Drop3Pct: DropCount{Close: 1, Low: 2},
+			Drop4Pct: DropCount{Close: 0, Low: 1},
+			Drop5Pct: DropCount{Close: 0, Low: 0},
 		},
 	}
 
