@@ -8,7 +8,6 @@ services:
     ports:
       - "8000:8080"
     environment:
-      - PORT=8080
       - TZ=UTC
     user: "8888:8888"
     read_only: true
