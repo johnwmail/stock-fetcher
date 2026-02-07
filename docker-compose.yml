@@ -6,13 +6,15 @@ services:
     image: stock-fetcher:latest
     container_name: stock-fetcher
     ports:
-      - "8000:8080"
+      - "8080:8080"
     environment:
       - TZ=UTC
-    user: "8888:8888"
+    user: "8080:8080"
     read_only: true
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - all
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]

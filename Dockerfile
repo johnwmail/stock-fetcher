@@ -19,9 +19,9 @@ FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates tzdata
 
-# Create non-root user with UID/GID 8888
-RUN addgroup -g 8888 appgroup && \
-    adduser -D -u 8888 -G appgroup appuser
+# Create non-root user with UID/GID 8080
+RUN addgroup -g 8080 appgroup && \
+    adduser -D -u 8080 -G appgroup appuser
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ COPY --from=builder /app/stock-fetcher .
 RUN chown -R appuser:appgroup /app
 
 # Switch to non-root user
-USER 8888:8888
+USER 8080:8080
 
 # Expose port
 EXPOSE 8080
