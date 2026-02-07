@@ -11,8 +11,15 @@ RUN go mod download
 COPY *.go ./
 COPY web/ ./web/
 
-# Build binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags='-w -s' -o stock-fetcher .
+# Build arguments for version info
+ARG VERSION=vDev
+ARG BUILD_TIME=timeless
+ARG COMMIT_HASH=sha-unknown
+
+# Build binary with version info
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-w -s -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.CommitHash=${COMMIT_HASH}" \
+    -o stock-fetcher .
 
 # Runtime stage
 FROM alpine:latest

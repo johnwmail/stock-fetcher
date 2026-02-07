@@ -118,6 +118,7 @@ func (s *Server) Start() error {
 		close(done)
 	}()
 
+	log.Printf("Stock Fetcher %s (commit: %s, built: %s)", Version, CommitHash, BuildTime)
 	log.Printf("Server starting on port %s", s.port)
 	if err := server.ListenAndServe(); err != http.ErrServerClosed {
 		return err
@@ -159,8 +160,10 @@ func writeSuccess(w http.ResponseWriter, data interface{}) {
 // handleHealth handles health check requests
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, map[string]string{
-		"status":  "ok",
-		"version": "1.0.0",
+		"status":     "ok",
+		"version":    Version,
+		"commit":     CommitHash,
+		"build_time": BuildTime,
 	})
 }
 
