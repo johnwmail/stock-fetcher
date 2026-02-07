@@ -5,34 +5,14 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (e.g., v1.0.0)'
-        required: true
-        type: string
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  validate:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Validate tag format
-        run: |
-          TAG="${{ inputs.tag }}"
-          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+ ]]; then
-            echo "Error: Tag must start with 'v' followed by version (e.g., v1.0.0)"
-            exit 1
-          fi
-          echo "Tag $TAG is valid"
-
   build:
     runs-on: ubuntu-latest
-    needs: [validate]
-    if: always() && (needs.validate.result == 'success' || needs.validate.result == 'skipped')
     permissions:
       contents: read
       packages: write
@@ -51,20 +31,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine version tag
-        id: version
+      - name: Determine image tags
+        id: tags
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # Manual trigger - use input tag, strip 'v' prefix
-            VERSION="${{ inputs.tag }}"
+            # Manual trigger - use short SHA only, no latest
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "version=${SHORT_SHA}" >> $GITHUB_OUTPUT
           else
-            # Tag push - use git tag, strip 'v' prefix
+            # Tag push - use version (without 'v') and latest
             VERSION="${{ github.ref_name }}"
+            VERSION_NUM="${VERSION#v}"
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION_NUM}" >> $GITHUB_OUTPUT
+            echo "version=${VERSION_NUM}" >> $GITHUB_OUTPUT
           fi
-          # Remove 'v' prefix
-          VERSION_NUM="${VERSION#v}"
-          echo "version=$VERSION_NUM" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION_NUM"
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -72,9 +53,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -84,12 +63,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Registry:** ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
-          echo "- \`latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:** ${{ steps.tags.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Pull command:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
