@@ -1,9 +1,6 @@
 services:
   stock-fetcher:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: stock-fetcher:latest
+    image: ghcr.io/johnwmail/stock-fetcher:latest
     container_name: stock-fetcher
     ports:
       - "8080:8080"
