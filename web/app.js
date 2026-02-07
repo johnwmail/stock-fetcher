@@ -307,15 +307,20 @@ async function showIndexSymbols(indexKey) {
         desc.textContent = result.data.description || '';
         
         tbody.innerHTML = '';
+        
+        // Check if we have company names in the response
+        const hasCompanyNames = result.data.companies && Object.keys(result.data.companies).length > 0;
+        
         result.data.symbols.forEach((symbol, idx) => {
             const tr = document.createElement('tr');
             tr.className = 'border-b border-gray-700 hover:bg-gray-700';
+            const companyName = hasCompanyNames ? (result.data.companies[symbol] || '-') : '-';
             tr.innerHTML = `
                 <td class="py-2 px-2 text-gray-500">${idx + 1}</td>
-                <td class="py-2 px-2 font-mono">${symbol}</td>
                 <td class="py-2 px-2">
-                    <button onclick="fetchSymbol('${symbol}')" class="text-blue-400 hover:text-blue-300 text-xs">Fetch</button>
+                    <span onclick="fetchSymbol('${symbol}')" class="font-mono text-blue-400 hover:text-blue-300 cursor-pointer hover:underline">${symbol}</span>
                 </td>
+                <td class="py-2 px-2 text-gray-400">${companyName}</td>
             `;
             tbody.appendChild(tr);
         });

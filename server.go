@@ -304,6 +304,7 @@ func (s *Server) handleIndexSymbols(w http.ResponseWriter, r *http.Request) {
 		"name":        idx.Name,
 		"description": idx.Description,
 		"symbols":     idx.Symbols,
+		"companies":   GetCompanyNamesForSymbols(idx.Symbols),
 		"count":       len(idx.Symbols),
 	})
 }
