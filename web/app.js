@@ -277,7 +277,7 @@ async function loadIndices() {
         result.data.forEach(idx => {
             const card = document.createElement('div');
             card.className = 'bg-gray-800 rounded-lg p-4 hover:bg-gray-700 cursor-pointer transition-colors';
-            card.onclick = () => showIndexModal(idx.key);
+            card.onclick = () => showIndexSymbols(idx.key);
             card.innerHTML = `
                 <h4 class="font-bold text-blue-400">${idx.name}</h4>
                 <p class="text-sm text-gray-400">${idx.description}</p>
@@ -290,20 +290,54 @@ async function loadIndices() {
     }
 }
 
-// Show index symbols (simple alert for now)
-async function showIndexModal(indexKey) {
+// Show index symbols in table
+async function showIndexSymbols(indexKey) {
     try {
         const response = await fetch(`${API_BASE}/api/indices/${indexKey}`);
         const result = await response.json();
 
         if (!result.success) return;
 
-        const symbols = result.data.symbols.slice(0, 20).join(', ');
-        const more = result.data.count > 20 ? `... and ${result.data.count - 20} more` : '';
-        alert(`${result.data.name}\n\n${symbols}${more}`);
+        const section = document.getElementById('indexSymbolsSection');
+        const title = document.getElementById('indexSymbolsTitle');
+        const desc = document.getElementById('indexSymbolsDesc');
+        const tbody = document.getElementById('indexSymbolsBody');
+
+        title.textContent = `${result.data.name} (${result.data.count} symbols)`;
+        desc.textContent = result.data.description || '';
+        
+        tbody.innerHTML = '';
+        result.data.symbols.forEach((symbol, idx) => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-gray-700 hover:bg-gray-700';
+            tr.innerHTML = `
+                <td class="py-2 px-2 text-gray-500">${idx + 1}</td>
+                <td class="py-2 px-2 font-mono">${symbol}</td>
+                <td class="py-2 px-2">
+                    <button onclick="fetchSymbol('${symbol}')" class="text-blue-400 hover:text-blue-300 text-xs">Fetch</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        section.classList.remove('hidden');
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
         console.error('Failed to load index symbols:', error);
     }
+}
+
+// Hide index symbols table
+function hideIndexSymbols() {
+    document.getElementById('indexSymbolsSection').classList.add('hidden');
+}
+
+// Fetch a symbol from the index table
+function fetchSymbol(symbol) {
+    document.getElementById('symbol').value = symbol;
+    document.getElementById('fetchBtn').click();
+    hideIndexSymbols();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // Export to CSV

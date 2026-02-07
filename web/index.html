@@ -144,8 +144,33 @@
         <!-- Indices Section -->
         <div class="mt-12">
             <h3 class="text-xl font-bold mb-4 text-gray-300">📊 Available Indices</h3>
-            <div id="indices" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- Dynamic indices -->
+            <div id="indices" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <!-- Dynamic indices cards -->
+            </div>
+            
+            <!-- Index Symbols Table (shown when an index is selected) -->
+            <div id="indexSymbolsSection" class="hidden">
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 id="indexSymbolsTitle" class="text-lg font-bold text-blue-400"></h4>
+                        <button onclick="hideIndexSymbols()" class="text-gray-400 hover:text-white text-sm">✕ Close</button>
+                    </div>
+                    <p id="indexSymbolsDesc" class="text-sm text-gray-400 mb-4"></p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-gray-400 border-b border-gray-700">
+                                    <th class="py-2 px-2">#</th>
+                                    <th class="py-2 px-2">Symbol</th>
+                                    <th class="py-2 px-2">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="indexSymbolsBody" class="text-gray-300">
+                                <!-- Dynamic symbols -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
