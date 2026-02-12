@@ -380,73 +380,15 @@ function exportJSON() {
 }
 
 // Export table format (fixed-width columns like CLI output)
-function exportTable() {
+function exportExcel() {
     if (!currentData) return;
-    const records = currentData.records;
-    const isDaily = currentData.period_type === 'daily';
-    const hasPE = currentData.data_source === 'macrotrends';
+    const symbol = currentData.symbol;
+    const period = currentData.period_type;
+    const days = document.getElementById('days').value || 365;
     
-    let lines = [];
-    
-    if (isDaily) {
-        // Daily format
-        if (hasPE) {
-            lines.push(sprintf('%-12s %12s %12s %12s %12s %12s %10s %10s %10s', 
-                'Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Change', 'HChange', 'PE'));
-            lines.push('-'.repeat(110));
-            records.forEach(r => {
-                lines.push(sprintf('%-12s %12s %12s %12s %12s %12s %10s %10s %10s',
-                    r.date, r.open, r.high, r.low, r.close, r.volume, r.change || '', r.hchange || '', r.pe || ''));
-            });
-        } else {
-            lines.push(sprintf('%-12s %12s %12s %12s %12s %12s %10s %10s', 
-                'Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Change', 'HChange'));
-            lines.push('-'.repeat(100));
-            records.forEach(r => {
-                lines.push(sprintf('%-12s %12s %12s %12s %12s %12s %10s %10s',
-                    r.date, r.open, r.high, r.low, r.close, r.volume, r.change || '', r.hchange || ''));
-            });
-        }
-    } else {
-        // Period format
-        if (hasPE) {
-            lines.push(sprintf('%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5s %7s %7s %7s %7s',
-                'Period', 'Start', 'End', 'Open', 'High', 'Low', 'Close', 'Volume', 'Change', 'HChange', 'PE', 'Days', 'C/L-2%', 'C/L-3%', 'C/L-4%', 'C/L-5%'));
-            lines.push('-'.repeat(160));
-            records.forEach(r => {
-                lines.push(sprintf('%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5d %7s %7s %7s %7s',
-                    r.period, r.start_date, r.end_date, r.open, r.high, r.low, r.close, r.volume,
-                    r.change || '', r.hchange || '', r.pe || '', r.days,
-                    formatDropCount(r.drop_2pct), formatDropCount(r.drop_3pct), formatDropCount(r.drop_4pct), formatDropCount(r.drop_5pct)));
-            });
-        } else {
-            lines.push(sprintf('%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s',
-                'Period', 'Start', 'End', 'Open', 'High', 'Low', 'Close', 'Volume', 'Change', 'HChange', 'Days', 'C/L-2%', 'C/L-3%', 'C/L-4%', 'C/L-5%'));
-            lines.push('-'.repeat(150));
-            records.forEach(r => {
-                lines.push(sprintf('%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %7s %7s %7s %7s',
-                    r.period, r.start_date, r.end_date, r.open, r.high, r.low, r.close, r.volume,
-                    r.change || '', r.hchange || '', r.days,
-                    formatDropCount(r.drop_2pct), formatDropCount(r.drop_3pct), formatDropCount(r.drop_4pct), formatDropCount(r.drop_5pct)));
-            });
-        }
-    }
-    
-    downloadFile(lines.join('\n'), `${currentData.symbol}_${currentData.period_type}.txt`, 'text/plain');
-}
-
-// Simple sprintf for fixed-width formatting
-function sprintf(format, ...args) {
-    let i = 0;
-    return format.replace(/%-?(\d+)s|%-?(\d+)d/g, (match, strWidth, numWidth) => {
-        const val = args[i++];
-        const width = parseInt(strWidth || numWidth);
-        const str = String(val ?? '');
-        if (match.startsWith('%-')) {
-            return str.padEnd(width);
-        }
-        return str.padStart(width);
-    });
+    // Trigger download via server endpoint
+    const url = `${API_BASE}/api/stock-excel/${symbol}?days=${days}&period=${period}`;
+    window.location.href = url;
 }
 
 // Format drop count object as C/L string

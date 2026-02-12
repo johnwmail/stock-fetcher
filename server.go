@@ -14,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
 )
 
 //go:embed web/*
@@ -66,6 +67,7 @@ func (s *Server) setupRoutes() {
 	// API routes
 	s.router.HandleFunc("/api/health", s.handleHealth)
 	s.router.HandleFunc("/api/stock/", s.handleStock)
+	s.router.HandleFunc("/api/stock-excel/", s.handleStockExcel)
 	s.router.HandleFunc("/api/indices", s.handleIndices)
 	s.router.HandleFunc("/api/indices/", s.handleIndexSymbols)
 
@@ -307,6 +309,82 @@ func (s *Server) handleIndexSymbols(w http.ResponseWriter, r *http.Request) {
 		"companies":   GetCompanyNamesForSymbols(idx.Symbols),
 		"count":       len(idx.Symbols),
 	})
+}
+
+// handleStockExcel handles Excel export requests
+// GET /api/stock-excel/{symbol}?days=365&period=daily
+func (s *Server) handleStockExcel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Parse symbol from path
+	path := strings.TrimPrefix(r.URL.Path, "/api/stock-excel/")
+	symbol := strings.TrimSuffix(path, "/")
+	if symbol == "" {
+		writeError(w, http.StatusBadRequest, "Symbol is required")
+		return
+	}
+	symbol = strings.ToUpper(symbol)
+
+	// Parse query parameters
+	query := r.URL.Query()
+	days := 365
+	if d := query.Get("days"); d != "" {
+		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 {
+			days = parsed
+		}
+	}
+	period := query.Get("period")
+	if period == "" {
+		period = "daily"
+	}
+
+	// Determine data source
+	useYahoo := isHKStock(symbol)
+
+	// Fetch stock data
+	data, ttmEPS, companyName, includePE, err := fetchStockData(symbol, days, useYahoo)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Prepare Excel params
+	params := ExcelParams{
+		Symbol:      symbol,
+		CompanyName: companyName,
+		Period:      period,
+		TTMEPS:      ttmEPS,
+		IncludePE:   includePE,
+	}
+
+	if period == "daily" {
+		params.Data = data
+	} else {
+		periodType, _ := ParsePeriodType(period)
+		reversedData := reverseData(data)
+		params.PeriodData = AggregateToPeriods(reversedData, periodType)
+	}
+
+	// Generate Excel file
+	f, err := GenerateExcel(params)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to generate Excel")
+		return
+	}
+	defer func() { _ = f.Close() }()
+
+	// Set response headers
+	filename := fmt.Sprintf("%s_%s.xlsx", symbol, period)
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+
+	// Write to response
+	if err := f.Write(w); err != nil {
+		log.Printf("Error writing Excel file: %v", err)
+	}
 }
 
 // runServer starts the web server (called from main)
