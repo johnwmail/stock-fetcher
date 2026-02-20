@@ -9,7 +9,7 @@ import (
 )
 
 func TestHealthEndpoint(t *testing.T) {
-	server := NewServer("0")
+	server := NewServer("0", nil)
 
 	req := httptest.NewRequest("GET", "/api/health", nil)
 	w := httptest.NewRecorder()
@@ -31,7 +31,7 @@ func TestHealthEndpoint(t *testing.T) {
 }
 
 func TestIndicesEndpoint(t *testing.T) {
-	server := NewServer("0")
+	server := NewServer("0", nil)
 
 	req := httptest.NewRequest("GET", "/api/indices", nil)
 	w := httptest.NewRecorder()
@@ -63,7 +63,7 @@ func TestIndicesEndpoint(t *testing.T) {
 }
 
 func TestIndexSymbolsEndpoint(t *testing.T) {
-	server := NewServer("0")
+	server := NewServer("0", nil)
 
 	req := httptest.NewRequest("GET", "/api/indices/dow", nil)
 	w := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestIndexSymbolsEndpoint(t *testing.T) {
 }
 
 func TestIndexSymbolsNotFound(t *testing.T) {
-	server := NewServer("0")
+	server := NewServer("0", nil)
 
 	req := httptest.NewRequest("GET", "/api/indices/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -98,7 +98,7 @@ func TestIndexSymbolsNotFound(t *testing.T) {
 }
 
 func TestStockEndpointMissingSymbol(t *testing.T) {
-	server := NewServer("0")
+	server := NewServer("0", nil)
 
 	req := httptest.NewRequest("GET", "/api/stock/", nil)
 	w := httptest.NewRecorder()
@@ -111,7 +111,7 @@ func TestStockEndpointMissingSymbol(t *testing.T) {
 }
 
 func TestStockEndpointInvalidPeriod(t *testing.T) {
-	server := NewServer("0")
+	server := NewServer("0", nil)
 
 	req := httptest.NewRequest("GET", "/api/stock/AAPL?period=invalid", nil)
 	w := httptest.NewRecorder()
@@ -124,7 +124,7 @@ func TestStockEndpointInvalidPeriod(t *testing.T) {
 }
 
 func TestCORSHeaders(t *testing.T) {
-	server := NewServer("0")
+	server := NewServer("0", nil)
 
 	req := httptest.NewRequest("OPTIONS", "/api/health", nil)
 	w := httptest.NewRecorder()
@@ -141,7 +141,7 @@ func TestCORSHeaders(t *testing.T) {
 }
 
 func TestStaticFiles(t *testing.T) {
-	server := NewServer("0")
+	server := NewServer("0", nil)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()

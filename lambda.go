@@ -15,7 +15,8 @@ var httpAdapter *httpadapter.HandlerAdapter
 
 func init() {
 	log.Println("Lambda cold start")
-	server := NewServer("0")
+	cache := InitCache()
+	server := NewServer("0", cache)
 	httpAdapter = httpadapter.New(server.Handler())
 }
 

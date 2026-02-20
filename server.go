@@ -50,13 +50,15 @@ type StockResponse struct {
 type Server struct {
 	port   string
 	router *http.ServeMux
+	cache  *Cache
 }
 
 // NewServer creates a new HTTP server
-func NewServer(port string) *Server {
+func NewServer(port string, cache *Cache) *Server {
 	s := &Server{
 		port:   port,
 		router: http.NewServeMux(),
+		cache:  cache,
 	}
 	s.setupRoutes()
 	return s
@@ -186,7 +188,7 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse query parameters
-	days := 365
+	days := 1825
 	if d := r.URL.Query().Get("days"); d != "" {
 		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 {
 			days = parsed
@@ -195,7 +197,7 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 
 	period := r.URL.Query().Get("period")
 	if period == "" {
-		period = "daily"
+		period = "monthly"
 	}
 
 	// Validate period
@@ -210,7 +212,7 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch data
 	useYahoo := isHKStock(symbol)
-	data, ttmEPS, companyName, includePE, err := fetchStockData(symbol, days, useYahoo)
+	data, ttmEPS, companyName, includePE, err := fetchStockData(s.cache, symbol, days, useYahoo)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch data: %v", err))
 		return
@@ -330,7 +332,7 @@ func (s *Server) handleStockExcel(w http.ResponseWriter, r *http.Request) {
 
 	// Parse query parameters
 	query := r.URL.Query()
-	days := 365
+	days := 1825
 	if d := query.Get("days"); d != "" {
 		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 {
 			days = parsed
@@ -338,14 +340,14 @@ func (s *Server) handleStockExcel(w http.ResponseWriter, r *http.Request) {
 	}
 	period := query.Get("period")
 	if period == "" {
-		period = "daily"
+		period = "monthly"
 	}
 
 	// Determine data source
 	useYahoo := isHKStock(symbol)
 
 	// Fetch stock data
-	data, ttmEPS, companyName, includePE, err := fetchStockData(symbol, days, useYahoo)
+	data, ttmEPS, companyName, includePE, err := fetchStockData(s.cache, symbol, days, useYahoo)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -389,6 +391,10 @@ func (s *Server) handleStockExcel(w http.ResponseWriter, r *http.Request) {
 
 // runServer starts the web server (called from main)
 func runServer(port string) error {
-	server := NewServer(port)
+	cache := InitCache()
+	if cache != nil {
+		defer cache.Close()
+	}
+	server := NewServer(port, cache)
 	return server.Start()
 }

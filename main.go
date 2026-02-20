@@ -126,8 +126,8 @@ func formatCompanyName(slug string) string {
 	return strings.Join(words, " ")
 }
 
-// fetchStockData fetches stock data from appropriate source
-func fetchStockData(symbol string, days int, useYahoo bool) ([]StockData, float64, string, bool, error) {
+// fetchFromProvider fetches stock data directly from the upstream provider
+func fetchFromProvider(symbol string, days int, useYahoo bool) ([]StockData, float64, string, bool, error) {
 	var data []StockData
 	var companyName string
 	var ttmEPS float64
@@ -147,6 +147,90 @@ func fetchStockData(symbol string, days int, useYahoo bool) ([]StockData, float6
 	}
 
 	return data, ttmEPS, companyName, includePE, err
+}
+
+// fetchStockData fetches stock data, using cache when available.
+// The cache stores raw OHLCV+PE; Change/HChange are recomputed on read.
+func fetchStockData(cache *Cache, symbol string, days int, useYahoo bool) ([]StockData, float64, string, bool, error) {
+	symbolUpper := strings.ToUpper(symbol)
+	startDate := time.Now().AddDate(0, 0, -days).Format("2006-01-02")
+	today := time.Now().Format("2006-01-02")
+
+	if cache != nil {
+		meta, _ := cache.GetFetchMeta(symbolUpper)
+
+		// Cache hit: fresh today and covers the requested range
+		if meta != nil && meta.IsFresh() && meta.CoversRange(startDate) {
+			data, err := cache.GetDailyPrices(symbolUpper, startDate, today)
+			if err == nil && len(data) > 0 {
+				includePE := meta.Source == "macrotrends"
+				return data, meta.TTMEPS, meta.CompanyName, includePE, nil
+			}
+		}
+
+		// Cache stale or doesn't cover range — fetch from provider
+		// If we have some cached data, fetch only the delta
+		fetchDays := days
+		if meta != nil && meta.CoversRange(startDate) {
+			// We have the range but it's stale — just fetch recent delta
+			daysSinceLatest := int(time.Since(meta.LastFetched).Hours()/24) + 5
+			if daysSinceLatest < fetchDays {
+				fetchDays = daysSinceLatest
+			}
+		}
+
+		data, ttmEPS, companyName, includePE, err := fetchFromProvider(symbol, fetchDays, useYahoo)
+		if err != nil {
+			// Provider failed — try serving stale cache if available
+			if meta != nil {
+				staleData, cacheErr := cache.GetDailyPrices(symbolUpper, startDate, today)
+				if cacheErr == nil && len(staleData) > 0 {
+					incPE := meta.Source == "macrotrends"
+					return staleData, meta.TTMEPS, meta.CompanyName, incPE, nil
+				}
+			}
+			return nil, 0, "", false, err
+		}
+
+		// Store new data in cache
+		if len(data) > 0 {
+			_ = cache.StoreDailyPrices(symbolUpper, data)
+
+			source := "yahoo"
+			if includePE {
+				source = "macrotrends"
+			}
+
+			// Determine date range in cache
+			earliestDate := data[len(data)-1].Date // data is newest-first
+			latestDate := data[0].Date
+			if meta != nil && meta.EarliestDate < earliestDate {
+				earliestDate = meta.EarliestDate
+			}
+
+			_ = cache.UpdateFetchLog(FetchMeta{
+				Symbol:       symbolUpper,
+				Source:       source,
+				CompanyName:  companyName,
+				TTMEPS:       ttmEPS,
+				LastFetched:  time.Now(),
+				LatestDate:   latestDate,
+				EarliestDate: earliestDate,
+			})
+		}
+
+		// Serve full range from cache (includes old + new data)
+		cachedData, cacheErr := cache.GetDailyPrices(symbolUpper, startDate, today)
+		if cacheErr == nil && len(cachedData) > 0 {
+			return cachedData, ttmEPS, companyName, includePE, nil
+		}
+
+		// Fallback: return provider data directly
+		return data, ttmEPS, companyName, includePE, nil
+	}
+
+	// No cache — fetch directly from provider
+	return fetchFromProvider(symbol, days, useYahoo)
 }
 
 func main() {

@@ -36,3 +36,6 @@ main
 *.csv
 *.txt
 *.json
+cache.db
+cache.db-wal
+cache.db-shm

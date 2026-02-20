@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Fetch stock data
 async function fetchStock() {
     const symbol = document.getElementById('symbol').value.trim().toUpperCase();
-    const days = document.getElementById('days').value || 365;
+    const days = document.getElementById('days').value || 1825;
     const period = document.getElementById('period').value;
 
     if (!symbol) {
@@ -468,7 +468,7 @@ function exportExcel() {
     if (!currentData) return;
     const symbol = currentData.symbol;
     const period = currentData.period_type;
-    const days = document.getElementById('days').value || 365;
+    const days = document.getElementById('days').value || 1825;
     
     // Trigger download via server endpoint
     const url = `${API_BASE}/api/stock-excel/${symbol}?days=${days}&period=${period}`;
