@@ -1,10 +1,7 @@
 package main
 
 import (
-	"encoding/csv"
-	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -305,118 +302,6 @@ func formatVolumeFloat(v float64) string {
 	return fmt.Sprintf("%.0f", v)
 }
 
-// WritePeriodCSV writes period data to a CSV file
-func WritePeriodCSV(data []PeriodData, filename string, includePE bool) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
 
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
 
-	// Drop columns now show C/L (Close-based/Low-based)
-	if includePE {
-		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%"}); err != nil {
-			return err
-		}
-		for _, d := range data {
-			if err := writer.Write([]string{
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE,
-				strconv.Itoa(d.Days), d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String(),
-			}); err != nil {
-				return err
-			}
-		}
-	} else {
-		if err := writer.Write([]string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%"}); err != nil {
-			return err
-		}
-		for _, d := range data {
-			if err := writer.Write([]string{
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange,
-				strconv.Itoa(d.Days), d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String(),
-			}); err != nil {
-				return err
-			}
-		}
-	}
 
-	return nil
-}
-
-// WritePeriodJSON writes period data to a JSON file
-func WritePeriodJSON(data []PeriodData, filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(data)
-}
-
-// WritePeriodTable writes period data in a formatted table
-func WritePeriodTable(data []PeriodData, filename string, includePE bool) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	// Drop columns show C/L (Close-based/Low-based)
-	if includePE {
-		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
-		_, _ = fmt.Fprintln(file, strings.Repeat("-", 162))
-		for _, d := range data {
-			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5d %7s %7s %7s %7s\n",
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE,
-				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
-		}
-	} else {
-		_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
-		_, _ = fmt.Fprintln(file, strings.Repeat("-", 152))
-		for _, d := range data {
-			_, _ = fmt.Fprintf(file, "%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %7s %7s %7s %7s\n",
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange,
-				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
-		}
-	}
-
-	return nil
-}
-
-// PrintPeriodPreview prints a preview of period data to stdout
-func PrintPeriodPreview(data []PeriodData, count int, includePE bool) {
-	// Drop columns show C/L (Close-based/Low-based)
-	if includePE {
-		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
-		fmt.Println(strings.Repeat("-", 162))
-		for i, d := range data {
-			if i >= count {
-				break
-			}
-			fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %8s %5d %7s %7s %7s %7s\n",
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE,
-				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
-		}
-	} else {
-		fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5s %7s %7s %7s %7s\n",
-			"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "Days", "C/L-2%", "C/L-3%", "C/L-4%", "C/L-5%")
-		fmt.Println(strings.Repeat("-", 152))
-		for i, d := range data {
-			if i >= count {
-				break
-			}
-			fmt.Printf("%-10s %-12s %-12s %10s %10s %10s %10s %10s %8s %8s %5d %7s %7s %7s %7s\n",
-				d.Period, d.StartDate, d.EndDate, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange,
-				d.Days, d.Drop2Pct.String(), d.Drop3Pct.String(), d.Drop4Pct.String(), d.Drop5Pct.String())
-		}
-	}
-}

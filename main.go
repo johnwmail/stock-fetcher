@@ -1,9 +1,6 @@
 package main
 
 import (
-	"encoding/csv"
-	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -20,148 +17,13 @@ type StockData struct {
 	Close   string `json:"close"`
 	Volume  string `json:"volume"`
 	Change  string `json:"change"`
-	HChange string `json:"hchange"` // Change from previous high
+	HChange string `json:"hchange"`
 	PE      string `json:"pe,omitempty"`
 }
 
 // isHKStock checks if the symbol is a Hong Kong stock
 func isHKStock(symbol string) bool {
 	return strings.HasSuffix(strings.ToUpper(symbol), ".HK")
-}
-
-// WriteCSV writes stock data to a CSV file
-func WriteCSV(data []StockData, filename string, includePE bool) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-
-	if includePE {
-		if err := writer.Write([]string{"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE"}); err != nil {
-			return err
-		}
-		for _, d := range data {
-			if err := writer.Write([]string{d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE}); err != nil {
-				return err
-			}
-		}
-	} else {
-		if err := writer.Write([]string{"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange"}); err != nil {
-			return err
-		}
-		for _, d := range data {
-			if err := writer.Write([]string{d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange}); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// WriteJSON writes stock data to a JSON file
-func WriteJSON(data []StockData, filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(data)
-}
-
-// WriteTable writes stock data in a formatted table
-func WriteTable(data []StockData, filename string, includePE bool) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-
-	if includePE {
-		_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE")
-		_, _ = fmt.Fprintln(file, strings.Repeat("-", 105))
-		for _, d := range data {
-			_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE)
-		}
-	} else {
-		_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange")
-		_, _ = fmt.Fprintln(file, strings.Repeat("-", 95))
-		for _, d := range data {
-			_, _ = fmt.Fprintf(file, "%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange)
-		}
-	}
-
-	return nil
-}
-
-// expandListAlias expands list aliases to full names
-func expandListAlias(name string) string {
-	aliases := map[string]string{
-		"sp":     "sp500",
-		"hk":     "hangseng",
-		"nasdaq": "nasdaq100",
-	}
-	if expanded, ok := aliases[strings.ToLower(name)]; ok {
-		return expanded
-	}
-	return name
-}
-
-// listSymbols prints symbols for the specified index
-func listSymbols(indexName string) {
-	indices := GetIndices()
-
-	if indexName == "all" || indexName == "help" {
-		fmt.Println("Available indices:")
-		fmt.Println()
-		for key, idx := range indices {
-			fmt.Printf("  %-12s - %s (%d stocks)\n", key, idx.Name, len(idx.Symbols))
-		}
-		fmt.Println()
-		fmt.Println("Aliases: sp=sp500, hk=hangseng, nasdaq=nasdaq100")
-		fmt.Println()
-		fmt.Println("Usage: ./stock-fetcher -l <index>")
-		fmt.Println("Example: ./stock-fetcher -l sp")
-		return
-	}
-
-	// Expand alias
-	indexName = expandListAlias(indexName)
-
-	idx, ok := indices[strings.ToLower(indexName)]
-	if !ok {
-		fmt.Printf("Unknown index: %s\n", indexName)
-		fmt.Println("\nAvailable: sp500 (sp), dow, nasdaq100 (nasdaq), hangseng (hk)")
-		fmt.Println("Use '-l all' to see details.")
-		return
-	}
-
-	fmt.Printf("%s\n", idx.Name)
-	fmt.Printf("%s\n", idx.Description)
-	fmt.Printf("Total: %d stocks\n", len(idx.Symbols))
-	fmt.Println(strings.Repeat("-", 60))
-
-	cols := 8
-	for i, sym := range idx.Symbols {
-		fmt.Printf("%-10s", sym)
-		if (i+1)%cols == 0 {
-			fmt.Println()
-		}
-	}
-	if len(idx.Symbols)%cols != 0 {
-		fmt.Println()
-	}
 }
 
 // reverseData reverses the slice so newest data is first
@@ -174,11 +36,9 @@ func reverseData(data []StockData) []StockData {
 }
 
 // fetchUSStock fetches US stock data from macrotrends (with P/E)
-// Returns: data, latestEPS, companyName, error
 func fetchUSStock(symbol string, days int) ([]StockData, float64, string, error) {
 	fetcher := NewMacrotrendsFetcher()
 
-	// Get historical EPS data for P/E calculation
 	peData, err := fetcher.FetchPERatio(symbol)
 	if err != nil {
 		return nil, 0, "", fmt.Errorf("failed to fetch P/E data: %w", err)
@@ -186,13 +46,11 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, string, error)
 	latestEPS := peData.GetLatestTTM_EPS()
 	companyName := peData.CompanyName
 
-	// Get daily prices
 	prices, err := fetcher.FetchDailyPrices(symbol, days)
 	if err != nil {
 		return nil, 0, "", fmt.Errorf("failed to fetch price data: %w", err)
 	}
 
-	// Convert to StockData with P/E (calculate change from old to new first)
 	var data []StockData
 	var prevClose, prevHigh float64
 
@@ -202,21 +60,18 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, string, error)
 		high, _ := strconv.ParseFloat(p.High, 64)
 		low, _ := strconv.ParseFloat(p.Low, 64)
 
-		// Calculate change % (close to close)
 		change := ""
 		if prevClose > 0 {
 			pctChange := ((close - prevClose) / prevClose) * 100
 			change = fmt.Sprintf("%.2f%%", pctChange)
 		}
 
-		// Calculate HChange % (close relative to previous high)
 		hchange := ""
 		if prevHigh > 0 {
 			pctHChange := ((close - prevHigh) / prevHigh) * 100
 			hchange = fmt.Sprintf("%.2f%%", pctHChange)
 		}
 
-		// Calculate P/E using historical EPS for this date
 		pe := ""
 		historicalEPS := peData.GetEPSForDate(p.Date)
 		if historicalEPS > 0 {
@@ -239,12 +94,10 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, string, error)
 		prevHigh = high
 	}
 
-	// Reverse so newest is first
 	return reverseData(data), latestEPS, companyName, nil
 }
 
 // fetchHKStock fetches HK stock data from Yahoo (no P/E)
-// Returns: data, companyName, error
 func fetchHKStock(symbol string, days int) ([]StockData, string, error) {
 	fetcher := NewYahooFetcher()
 	endDate := time.Now()
@@ -255,7 +108,6 @@ func fetchHKStock(symbol string, days int) ([]StockData, string, error) {
 		return nil, "", err
 	}
 
-	// Reverse so newest is first
 	return reverseData(yahooData), companyName, nil
 }
 
@@ -264,9 +116,7 @@ func formatCompanyName(slug string) string {
 	if slug == "" {
 		return ""
 	}
-	// Replace dashes with spaces
 	name := strings.ReplaceAll(slug, "-", " ")
-	// Capitalize each word
 	words := strings.Fields(name)
 	for i, w := range words {
 		if len(w) > 0 {
@@ -276,35 +126,7 @@ func formatCompanyName(slug string) string {
 	return strings.Join(words, " ")
 }
 
-// getOutputExtension returns the file extension for the given format
-func getOutputExtension(format string) string {
-	switch format {
-	case "json":
-		return "json"
-	case "table":
-		return "txt"
-	default:
-		return "csv"
-	}
-}
-
-// adjustOutputFilename ensures the output filename has the correct extension
-func adjustOutputFilename(output, format string) string {
-	switch format {
-	case "json":
-		if !strings.HasSuffix(output, ".json") {
-			return strings.TrimSuffix(output, ".csv") + ".json"
-		}
-	case "table":
-		if !strings.HasSuffix(output, ".txt") {
-			return strings.TrimSuffix(output, ".csv") + ".txt"
-		}
-	}
-	return output
-}
-
 // fetchStockData fetches stock data from appropriate source
-// Returns: data, ttmEPS, companyName, includePE, error
 func fetchStockData(symbol string, days int, useYahoo bool) ([]StockData, float64, string, bool, error) {
 	var data []StockData
 	var companyName string
@@ -313,16 +135,11 @@ func fetchStockData(symbol string, days int, useYahoo bool) ([]StockData, float6
 	includePE := false
 
 	if useYahoo {
-		// Use Yahoo Finance (no P/E)
-		fmt.Printf("Fetching %d days of data for %s from Yahoo Finance...\n", days, strings.ToUpper(symbol))
 		data, companyName, err = fetchHKStock(symbol, days)
 	} else {
-		// Use macrotrends (with P/E)
-		fmt.Printf("Fetching %d days of data for %s from macrotrends.net...\n", days, strings.ToUpper(symbol))
 		data, ttmEPS, companyName, err = fetchUSStock(symbol, days)
 		if err != nil {
 			// Fallback to Yahoo Finance for ETFs or unsupported stocks
-			fmt.Printf("Macrotrends failed, falling back to Yahoo Finance...\n")
 			data, companyName, err = fetchHKStock(symbol, days)
 		} else {
 			includePE = true
@@ -332,240 +149,13 @@ func fetchStockData(symbol string, days int, useYahoo bool) ([]StockData, float6
 	return data, ttmEPS, companyName, includePE, err
 }
 
-// writeDailyOutput writes daily stock data in the specified format
-func writeDailyOutput(data []StockData, output, format string, includePE bool) error {
-	output = adjustOutputFilename(output, format)
-	switch format {
-	case "json":
-		return WriteJSON(data, output)
-	case "table":
-		return WriteTable(data, output, includePE)
-	default:
-		return WriteCSV(data, output, includePE)
-	}
-}
-
-// writePeriodOutput writes period data in the specified format
-func writePeriodOutput(data []PeriodData, output, format string, includePE bool) error {
-	output = adjustOutputFilename(output, format)
-	switch format {
-	case "json":
-		return WritePeriodJSON(data, output)
-	case "table":
-		return WritePeriodTable(data, output, includePE)
-	default:
-		return WritePeriodCSV(data, output, includePE)
-	}
-}
-
-// printDailyPreview prints a preview of daily data
-func printDailyPreview(data []StockData, count int, includePE bool) {
-	if includePE {
-		fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange", "PE")
-		fmt.Println(strings.Repeat("-", 105))
-		for i, d := range data {
-			if i >= count {
-				break
-			}
-			fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange, d.PE)
-		}
-	} else {
-		fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-			"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange")
-		fmt.Println(strings.Repeat("-", 95))
-		for i, d := range data {
-			if i >= count {
-				break
-			}
-			fmt.Printf("%-12s %12s %12s %12s %12s %12s %10s %10s\n",
-				d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.Change, d.HChange)
-		}
-	}
-}
-
-func printUsage() {
-	fmt.Println("Stock Price Fetcher - Fetch historical stock data with P/E ratio")
-	fmt.Println()
-	fmt.Println("Usage:")
-	fmt.Println("  stock-fetcher -s <SYMBOL> [options]    # CLI mode")
-	fmt.Println("  stock-fetcher -serve [port]            # Web server mode")
-	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println("  stock-fetcher -s AAPL                # US stock, 3 years, with P/E")
-	fmt.Println("  stock-fetcher -s AAPL -d 30          # US stock, 30 days")
-	fmt.Println("  stock-fetcher -s AAPL -y             # US stock, use Yahoo (no P/E)")
-	fmt.Println("  stock-fetcher -s 0700.HK             # HK stock (Yahoo, no P/E)")
-	fmt.Println("  stock-fetcher -s AAPL -p weekly      # Weekly aggregated report")
-	fmt.Println("  stock-fetcher -s AAPL -p monthly     # Monthly aggregated report")
-	fmt.Println("  stock-fetcher -l sp                  # List S&P 500 symbols")
-	fmt.Println("  stock-fetcher -l hk                  # List Hang Seng symbols")
-	fmt.Println("  stock-fetcher -serve                 # Start web server on port 8080")
-	fmt.Println("  stock-fetcher -serve 3000            # Start web server on port 3000")
-	fmt.Println()
-	fmt.Println("Options:")
-	fmt.Println("  -s, -sym, -symbol     Stock symbol (e.g., MSFT, AAPL, 0700.HK)")
-	fmt.Println("  -d, -days             Number of days (default: 1095 = 3 years)")
-	fmt.Println("  -p, -period           Period aggregation: weekly, monthly, quarterly, yearly")
-	fmt.Println("  -source, -src         Data source: macrotrends or yahoo")
-	fmt.Println("  -y                    Use Yahoo Finance (alias for -source yahoo)")
-	fmt.Println("  -m                    Use macrotrends.net (alias for -source macrotrends)")
-	fmt.Println("  -l, -list             List index: sp500/sp, dow, nasdaq100/nasdaq, hangseng/hk, all")
-	fmt.Println("  -format               Output format: csv, json, table (default: table)")
-	fmt.Println("  -output               Output filename (default: <SYMBOL>_historical.csv)")
-	fmt.Println("  -serve                Start web server (default port: 8080)")
-	fmt.Println()
-	fmt.Println("Period Reports:")
-	fmt.Println("  Period reports aggregate daily data and include drop day counts:")
-	fmt.Println("  - Drop2%: Days with 2-3% price drop")
-	fmt.Println("  - Drop3%: Days with 3-4% price drop")
-	fmt.Println("  - Drop4%: Days with 4-5% price drop")
-	fmt.Println("  - Drop5%: Days with 5%+ price drop")
-	fmt.Println()
-	fmt.Println("Data Sources:")
-	fmt.Println("  macrotrends  - Default for US stocks (includes P/E ratio)")
-	fmt.Println("  yahoo        - Default for HK stocks (no P/E)")
-}
-
-// handleServeMode starts the web server
-func handleServeMode() {
-	port := "8080"
-	if flag.NArg() > 0 {
-		port = flag.Arg(0)
-	}
-	// Also check PORT env var (for container deployments)
-	if envPort := os.Getenv("PORT"); envPort != "" {
-		port = envPort
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 	if err := runServer(port); err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
 		os.Exit(1)
 	}
-}
-
-func main() {
-	// Main flags
-	symbol := flag.String("symbol", "", "Stock symbol (e.g., MSFT, AAPL, 0700.HK)")
-	days := flag.Int("days", 1095, "Number of days of historical data (default 3 years)")
-	output := flag.String("output", "", "Output filename (default: <symbol>_historical.csv)")
-	format := flag.String("format", "table", "Output format: csv, json, or table")
-	source := flag.String("source", "", "Data source: macrotrends (with P/E) or yahoo (no P/E)")
-	listIndex := flag.String("list", "", "List symbols: sp500, dow, nasdaq100, hangseng, or 'all'")
-	period := flag.String("period", "", "Period aggregation: weekly, monthly, quarterly, yearly")
-	serve := flag.Bool("serve", false, "Start web server")
-
-	// Short aliases
-	flag.StringVar(symbol, "s", "", "Alias for -symbol")
-	flag.StringVar(symbol, "sym", "", "Alias for -symbol")
-	flag.IntVar(days, "d", 1095, "Alias for -days")
-	flag.StringVar(listIndex, "l", "", "Alias for -list")
-	flag.StringVar(period, "p", "", "Alias for -period")
-	yahooSource := flag.Bool("y", false, "Use Yahoo Finance as data source (alias for -source yahoo)")
-	macroSource := flag.Bool("m", false, "Use macrotrends as data source (alias for -source macrotrends)")
-	flag.StringVar(source, "src", "", "Alias for -source")
-
-	flag.Parse()
-
-	// Handle serve mode
-	if *serve {
-		handleServeMode()
-		return
-	}
-
-	// Handle source aliases
-	if *yahooSource {
-		*source = "yahoo"
-	} else if *macroSource {
-		*source = "macrotrends"
-	}
-
-	// Show usage if no arguments
-	if *symbol == "" && *listIndex == "" {
-		printUsage()
-		return
-	}
-
-	if *listIndex != "" {
-		listSymbols(*listIndex)
-		return
-	}
-
-	// Parse period type if specified
-	var periodType PeriodType
-	if *period != "" {
-		var err error
-		periodType, err = ParsePeriodType(*period)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
-	// Set default output filename
-	if *output == "" {
-		ext := getOutputExtension(*format)
-		if *period != "" {
-			*output = fmt.Sprintf("%s_%s.%s", strings.ToUpper(*symbol), *period, ext)
-		} else {
-			*output = fmt.Sprintf("%s_historical.%s", strings.ToUpper(*symbol), ext)
-		}
-	}
-
-	// Determine data source and fetch data
-	useYahoo := isHKStock(*symbol) || *source == "yahoo"
-	data, ttmEPS, companyName, includePE, err := fetchStockData(*symbol, *days, useYahoo)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error fetching data: %v\n", err)
-		os.Exit(1)
-	}
-
-	if len(data) == 0 {
-		fmt.Println("No data received.")
-		os.Exit(1)
-	}
-
-	// Format company name for display
-	companyName = formatCompanyName(companyName)
-
-	fmt.Printf("Received %d daily records for %s\n", len(data), companyName)
-	if includePE && ttmEPS > 0 {
-		fmt.Printf("TTM EPS: $%.2f\n", ttmEPS)
-	}
-
-	// Handle period aggregation
-	if *period != "" {
-		// Data is newest-first, but AggregateToPeriods expects oldest-first
-		reversedData := reverseData(data)
-		periodData := AggregateToPeriods(reversedData, periodType)
-
-		if len(periodData) == 0 {
-			fmt.Println("No period data generated.")
-			os.Exit(1)
-		}
-
-		fmt.Printf("Aggregated into %d %s periods\n", len(periodData), *period)
-
-		*output = adjustOutputFilename(*output, *format)
-		if err = writePeriodOutput(periodData, *output, *format, includePE); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("Data saved to %s\n", *output)
-		fmt.Println("\nPreview (first 5 periods):")
-		PrintPeriodPreview(periodData, 5, includePE)
-		return
-	}
-
-	// Write daily output
-	*output = adjustOutputFilename(*output, *format)
-	if err = writeDailyOutput(data, *output, *format, includePE); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Data saved to %s\n", *output)
-	fmt.Println("\nPreview (first 5 records):")
-	printDailyPreview(data, 5, includePE)
 }
