@@ -393,7 +393,7 @@ func (s *Server) handleStockExcel(w http.ResponseWriter, r *http.Request) {
 func runServer(port string) error {
 	cache := InitCache()
 	if cache != nil {
-		defer cache.Close()
+		defer func() { _ = cache.Close() }()
 	}
 	server := NewServer(port, cache)
 	return server.Start()

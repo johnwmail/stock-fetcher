@@ -35,13 +35,13 @@ func NewCache(dbPath string) (*Cache, error) {
 
 	// Enable WAL mode for better concurrent read performance
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("set WAL mode: %w", err)
 	}
 
 	c := &Cache{db: db}
 	if err := c.migrate(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("migrate cache db: %w", err)
 	}
 
@@ -112,7 +112,7 @@ func (c *Cache) GetDailyPrices(symbol, startDate, endDate string) ([]StockData, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var data []StockData
 	var prevClose, prevHigh float64
@@ -154,7 +154,7 @@ func (c *Cache) StoreDailyPrices(symbol string, data []StockData) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.Prepare(
 		`INSERT OR REPLACE INTO daily_prices (symbol, date, open, high, low, close, volume, pe)
@@ -162,7 +162,7 @@ func (c *Cache) StoreDailyPrices(symbol string, data []StockData) error {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for _, d := range data {
 		if _, err := stmt.Exec(symbol, d.Date, d.Open, d.High, d.Low, d.Close, d.Volume, d.PE); err != nil {
