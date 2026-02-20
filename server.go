@@ -14,7 +14,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
 )
 
 //go:embed web/*

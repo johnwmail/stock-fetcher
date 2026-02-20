@@ -115,23 +115,38 @@ func writePeriodData(f *excelize.File, sheet string, startRow int, data []Period
 	// Write data rows
 	for _, p := range data {
 		col := 1
-		setCell(f, sheet, col, startRow, p.Period); col++
-		setCell(f, sheet, col, startRow, p.StartDate); col++
-		setCell(f, sheet, col, startRow, p.EndDate); col++
-		setCell(f, sheet, col, startRow, parseFloatStr(p.Open)); col++
-		setCell(f, sheet, col, startRow, parseFloatStr(p.High)); col++
-		setCell(f, sheet, col, startRow, parseFloatStr(p.Low)); col++
-		setCell(f, sheet, col, startRow, parseFloatStr(p.Close)); col++
-		setCell(f, sheet, col, startRow, p.Volume); col++
-		setCell(f, sheet, col, startRow, p.Change); col++
-		setCell(f, sheet, col, startRow, p.HChange); col++
+		setCell(f, sheet, col, startRow, p.Period)
+		col++
+		setCell(f, sheet, col, startRow, p.StartDate)
+		col++
+		setCell(f, sheet, col, startRow, p.EndDate)
+		col++
+		setCell(f, sheet, col, startRow, parseFloatStr(p.Open))
+		col++
+		setCell(f, sheet, col, startRow, parseFloatStr(p.High))
+		col++
+		setCell(f, sheet, col, startRow, parseFloatStr(p.Low))
+		col++
+		setCell(f, sheet, col, startRow, parseFloatStr(p.Close))
+		col++
+		setCell(f, sheet, col, startRow, p.Volume)
+		col++
+		setCell(f, sheet, col, startRow, p.Change)
+		col++
+		setCell(f, sheet, col, startRow, p.HChange)
+		col++
 		if includePE {
-			setCell(f, sheet, col, startRow, p.PE); col++
+			setCell(f, sheet, col, startRow, p.PE)
+			col++
 		}
-		setCell(f, sheet, col, startRow, p.Days); col++
-		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop2Pct.Close, p.Drop2Pct.Low)); col++
-		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop3Pct.Close, p.Drop3Pct.Low)); col++
-		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop4Pct.Close, p.Drop4Pct.Low)); col++
+		setCell(f, sheet, col, startRow, p.Days)
+		col++
+		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop2Pct.Close, p.Drop2Pct.Low))
+		col++
+		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop3Pct.Close, p.Drop3Pct.Low))
+		col++
+		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop4Pct.Close, p.Drop4Pct.Low))
+		col++
 		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop5Pct.Close, p.Drop5Pct.Low))
 		startRow++
 	}

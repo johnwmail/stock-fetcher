@@ -321,5 +321,3 @@ func (data *FundamentalData) GetEPSForDate(date string) float64 {
 	}
 	return eps
 }
-
-

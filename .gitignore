@@ -33,9 +33,13 @@ go.work.sum
 
 stock-fetcher
 main
+bootstrap
+*.zip
 *.csv
 *.txt
 *.json
+*.xslx
 cache.db
 cache.db-wal
 cache.db-shm
+

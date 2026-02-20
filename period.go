@@ -32,11 +32,11 @@ type PeriodData struct {
 	Change    string    `json:"change"`     // Period change percentage
 	HChange   string    `json:"hchange"`    // Change from previous period high
 	PE        string    `json:"pe,omitempty"`
-	Days      int       `json:"days"`       // Number of trading days
-	Drop2Pct  DropCount `json:"drop_2pct"`  // Days with 2-3% drop (C/L)
-	Drop3Pct  DropCount `json:"drop_3pct"`  // Days with 3-4% drop (C/L)
-	Drop4Pct  DropCount `json:"drop_4pct"`  // Days with 4-5% drop (C/L)
-	Drop5Pct  DropCount `json:"drop_5pct"`  // Days with 5%+ drop (C/L)
+	Days      int       `json:"days"`      // Number of trading days
+	Drop2Pct  DropCount `json:"drop_2pct"` // Days with 2-3% drop (C/L)
+	Drop3Pct  DropCount `json:"drop_3pct"` // Days with 3-4% drop (C/L)
+	Drop4Pct  DropCount `json:"drop_4pct"` // Days with 4-5% drop (C/L)
+	Drop5Pct  DropCount `json:"drop_5pct"` // Days with 5%+ drop (C/L)
 }
 
 // PeriodType represents the type of period aggregation
@@ -187,7 +187,7 @@ func AggregateToPeriods(data []StockData, periodType PeriodType) []PeriodData {
 		var totalVolume float64
 		var drop2C, drop3C, drop4C, drop5C int // Close-based drops
 		var drop2L, drop3L, drop4L, drop5L int // Low-based drops
-		var dayPrevClose float64 // Track previous day's close for drop calculation
+		var dayPrevClose float64               // Track previous day's close for drop calculation
 
 		for i, d := range days {
 			high := parseFloat(d.High)
@@ -301,7 +301,3 @@ func formatVolumeFloat(v float64) string {
 	}
 	return fmt.Sprintf("%.0f", v)
 }
-
-
-
-

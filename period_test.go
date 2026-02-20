@@ -113,12 +113,12 @@ func TestClassifyDropPct(t *testing.T) {
 
 func TestCalculateDrops(t *testing.T) {
 	tests := []struct {
-		name        string
-		close       float64
-		low         float64
-		prevClose   float64
-		expectedC   int
-		expectedL   int
+		name      string
+		close     float64
+		low       float64
+		prevClose float64
+		expectedC int
+		expectedL int
 	}{
 		{"no drop close or low", 100, 100, 100, 0, 0},
 		{"2% close drop", 98, 98, 100, 2, 2},
@@ -206,7 +206,7 @@ func TestAggregateToPeriods(t *testing.T) {
 	data := []StockData{
 		{Date: "2024-01-08", Open: "100.00", High: "105.00", Low: "99.00", Close: "104.00", Volume: "1M", Change: ""},
 		{Date: "2024-01-09", Open: "104.00", High: "106.00", Low: "102.00", Close: "103.00", Volume: "1.5M", Change: "-0.96%"},
-		{Date: "2024-01-10", Open: "103.00", High: "104.00", Low: "98.00", Close: "99.00", Volume: "2M", Change: "-3.88%"},  // 3% drop
+		{Date: "2024-01-10", Open: "103.00", High: "104.00", Low: "98.00", Close: "99.00", Volume: "2M", Change: "-3.88%"}, // 3% drop
 		{Date: "2024-01-11", Open: "99.00", High: "101.00", Low: "97.00", Close: "100.00", Volume: "1.2M", Change: "1.01%"},
 		{Date: "2024-01-12", Open: "100.00", High: "102.00", Low: "95.00", Close: "96.00", Volume: "1.8M", Change: "-4.00%"}, // 4% drop
 	}
