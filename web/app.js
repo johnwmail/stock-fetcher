@@ -172,18 +172,8 @@ function buildTable(records, isDaily, hasPE) {
     });
 }
 
-// Check if we should show chart (not on mobile/small screens)
-function shouldShowChart() {
-    return window.innerWidth > 768;
-}
-
 // Build price chart
 function buildChart(records, isDaily, symbol) {
-    // Skip chart rendering on mobile/small screens
-    if (!shouldShowChart()) {
-        return;
-    }
-
     const ctx = document.getElementById('priceChart').getContext('2d');
 
     // Destroy existing chart
@@ -251,23 +241,10 @@ function buildChart(records, isDaily, symbol) {
             data: peValues,
             borderColor: 'rgb(251, 191, 36)',
             backgroundColor: 'rgba(251, 191, 36, 0.1)',
-            borderWidth: 1.5,
+            borderWidth: 2,
             pointRadius: 0,
             tension: 0.1,
             yAxisID: 'yPE',
-            borderDash: [3, 3],
-        });
-        datasets.push({
-            label: 'EPS (TTM)',
-            type: 'bar',
-            data: epsValues,
-            backgroundColor: 'rgba(168, 85, 247, 0.25)',
-            borderColor: 'rgba(168, 85, 247, 0.5)',
-            borderWidth: 1,
-            yAxisID: 'yEPS',
-            barPercentage: 1.0,
-            categoryPercentage: 1.0,
-            order: 10,
         });
     }
 
@@ -292,20 +269,6 @@ function buildChart(records, isDaily, symbol) {
             ticks: { color: 'rgb(251, 191, 36)' },
             grid: { drawOnChartArea: false },
             title: { display: true, text: 'P/E', color: 'rgb(251, 191, 36)' },
-        };
-        // Set EPS axis min so bars don't dominate the chart
-        const epsVals = epsValues.filter(v => v !== null);
-        const epsMin = Math.min(...epsVals);
-        const epsMax = Math.max(...epsVals);
-        const epsRange = epsMax - epsMin || 1;
-        scales.yEPS = {
-            type: 'linear',
-            position: 'right',
-            min: epsMin - epsRange * 0.3,
-            max: epsMax + epsRange * 3,
-            ticks: { color: 'rgb(168, 85, 247)' },
-            grid: { drawOnChartArea: false },
-            title: { display: true, text: 'EPS', color: 'rgb(168, 85, 247)' },
         };
     }
 
@@ -336,8 +299,14 @@ function buildChart(records, isDaily, symbol) {
                             const val = context.parsed.y;
                             if (val == null) return null;
                             if (label === 'P/E') return `P/E: ${val.toFixed(2)}`;
-                            if (label === 'EPS (TTM)') return `EPS: $${val.toFixed(2)}`;
                             return `${label}: $${val.toFixed(2)}`;
+                        },
+                        afterBody: function(contexts) {
+                            if (!hasPE) return '';
+                            const idx = contexts[0].dataIndex;
+                            const eps = epsValues[idx];
+                            if (eps != null) return `EPS: $${eps.toFixed(2)}`;
+                            return '';
                         }
                     }
                 }

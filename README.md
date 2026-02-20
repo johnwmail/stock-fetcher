@@ -8,9 +8,10 @@ A Go web server that fetches historical stock price data with P/E ratios.
 - **HK Stocks**: Daily prices via Yahoo Finance
 - Period aggregation: weekly, monthly, quarterly, yearly
 - Drop day analysis (2%–5%+ buckets, close-based and low-based)
-- SQLite cache — first fetch ~10s, subsequent fetches ~20ms
+- SQLite cache with delta fetching — first fetch ~10s, subsequent fetches ~20ms
 - Excel export
-- Web UI with interactive charts (price, P/E, EPS)
+- Responsive web UI with interactive charts (price, P/E) and EPS in tooltips
+- Mobile-friendly — chart renders on all screen sizes
 - AWS Lambda support
 
 ## Running
