@@ -197,15 +197,35 @@ func (m *FetchMeta) CoversRange(startDate string) bool {
 
 // InitCache initializes the global cache from DB_PATH env var.
 // Returns nil (no cache) if DB_PATH is explicitly set to empty or "none".
+// detectDBPath picks a DB path based on the runtime environment.
+//   - DB_PATH env set       → use that ("none" disables cache)
+//   - AWS Lambda detected   → /tmp/cache.db
+//   - /data dir exists (Docker volume) → /data/cache.db
+//   - otherwise             → ./cache.db
+func detectDBPath() string {
+	// Explicit override always wins
+	if p, set := os.LookupEnv("DB_PATH"); set {
+		return p
+	}
+
+	// Lambda: AWS_LAMBDA_FUNCTION_NAME is always set in Lambda
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
+		return "/tmp/cache.db"
+	}
+
+	// Docker/container: /data volume mount
+	if info, err := os.Stat("/data"); err == nil && info.IsDir() {
+		return "/data/cache.db"
+	}
+
+	return "cache.db"
+}
+
 func InitCache() *Cache {
-	dbPath := os.Getenv("DB_PATH")
+	dbPath := detectDBPath()
 	if dbPath == "none" || dbPath == "" {
-		// Check if DB_PATH was explicitly set to empty
-		if _, set := os.LookupEnv("DB_PATH"); set {
-			log.Println("Cache disabled (DB_PATH set to empty/none)")
-			return nil
-		}
-		dbPath = "cache.db"
+		log.Println("Cache disabled")
+		return nil
 	}
 
 	cache, err := NewCache(dbPath)
