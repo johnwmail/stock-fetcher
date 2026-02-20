@@ -58,13 +58,16 @@ function displayResults(data) {
     // Update info
     document.getElementById('companyName').textContent = data.company_name || data.symbol;
     document.getElementById('stockSymbol').textContent = data.symbol;
-    document.getElementById('dataSource').textContent = data.data_source;
+    const dsEl = document.getElementById('dataSource');
+    dsEl.textContent = data.data_source;
+    dsEl.href = data.provider_url || '#';
     document.getElementById('recordCount').textContent = data.record_count;
     
     // TTM EPS
     const epsContainer = document.getElementById('epsContainer');
+    const currencySymbol = data.currency === 'HKD' ? 'HK$' : '$';
     if (data.ttm_eps > 0) {
-        document.getElementById('ttmEps').textContent = `$${data.ttm_eps.toFixed(2)}`;
+        document.getElementById('ttmEps').textContent = `${currencySymbol}${data.ttm_eps.toFixed(2)}`;
         epsContainer.classList.remove('hidden');
     } else {
         epsContainer.classList.add('hidden');
@@ -78,7 +81,7 @@ function displayResults(data) {
     buildTable(records, isDaily, data.ttm_eps > 0);
 
     // Build chart
-    buildChart(records, isDaily, data.symbol);
+    buildChart(records, isDaily, data.symbol, data.currency || 'USD');
 
     // Show results
     document.getElementById('results').classList.remove('hidden');
@@ -173,7 +176,8 @@ function buildTable(records, isDaily, hasPE) {
 }
 
 // Build price chart
-function buildChart(records, isDaily, symbol) {
+function buildChart(records, isDaily, symbol, currency) {
+    const currencySymbol = currency === 'HKD' ? 'HK$' : '$';
     const ctx = document.getElementById('priceChart').getContext('2d');
 
     // Destroy existing chart
@@ -258,7 +262,7 @@ function buildChart(records, isDaily, symbol) {
             position: 'left',
             ticks: { color: '#9ca3af' },
             grid: { color: 'rgba(75, 85, 99, 0.3)' },
-            title: { display: true, text: 'Price', color: '#9ca3af' },
+            title: { display: true, text: `Price (${currency})`, color: '#9ca3af' },
         },
     };
 
@@ -299,13 +303,13 @@ function buildChart(records, isDaily, symbol) {
                             const val = context.parsed.y;
                             if (val == null) return null;
                             if (label === 'P/E') return `P/E: ${val.toFixed(2)}`;
-                            return `${label}: $${val.toFixed(2)}`;
+                            return `${label}: ${currencySymbol}${val.toFixed(2)}`;
                         },
                         afterBody: function(contexts) {
                             if (!hasPE) return '';
                             const idx = contexts[0].dataIndex;
                             const eps = epsValues[idx];
-                            if (eps != null) return `EPS: $${eps.toFixed(2)}`;
+                            if (eps != null) return `EPS: ${currencySymbol}${eps.toFixed(2)}`;
                             return '';
                         }
                     }

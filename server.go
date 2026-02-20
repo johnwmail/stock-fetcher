@@ -38,6 +38,8 @@ type StockResponse struct {
 	Symbol      string       `json:"symbol"`
 	CompanyName string       `json:"company_name"`
 	DataSource  string       `json:"data_source"`
+	ProviderURL string       `json:"provider_url"`
+	Currency    string       `json:"currency"`
 	TTM_EPS     float64      `json:"ttm_eps,omitempty"`
 	PeriodType  string       `json:"period_type"`
 	RecordCount int          `json:"record_count"`
@@ -222,17 +224,32 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine data source
+	// Determine data source, provider URL, and currency
 	dataSource := "macrotrends"
+	var providerURL string
+	upperSymbol := strings.ToUpper(symbol)
+	currency := "USD"
+	if useYahoo {
+		currency = "HKD"
+	}
 	if useYahoo || !includePE {
 		dataSource = "yahoo"
+		providerURL = fmt.Sprintf("https://finance.yahoo.com/quote/%s", upperSymbol)
+	} else {
+		slug := companyName
+		if slug == "" {
+			slug = strings.ToLower(symbol)
+		}
+		providerURL = fmt.Sprintf("https://www.macrotrends.net/stocks/charts/%s/%s/stock-price-history", upperSymbol, slug)
 	}
 
 	// Build response
 	resp := StockResponse{
-		Symbol:      strings.ToUpper(symbol),
+		Symbol:      upperSymbol,
 		CompanyName: formatCompanyName(companyName),
 		DataSource:  dataSource,
+		ProviderURL: providerURL,
+		Currency:    currency,
 		PeriodType:  period,
 	}
 
