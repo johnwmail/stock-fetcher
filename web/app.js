@@ -198,39 +198,112 @@ function buildChart(records, isDaily, symbol) {
     const highs = chartData.map(r => parseFloat(r.high));
     const lows = chartData.map(r => parseFloat(r.low));
 
+    // Check if P/E data is available
+    const hasPE = chartData.some(r => r.pe && r.pe !== '' && parseFloat(r.pe) > 0);
+    const peValues = hasPE ? chartData.map(r => {
+        const v = parseFloat(r.pe);
+        return v > 0 ? v : null;
+    }) : [];
+
+    // Compute EPS from close/pe where available
+    const epsValues = hasPE ? chartData.map(r => {
+        const close = parseFloat(r.close);
+        const pe = parseFloat(r.pe);
+        if (pe > 0 && close > 0) return parseFloat((close / pe).toFixed(2));
+        return null;
+    }) : [];
+
+    const datasets = [
+        {
+            label: 'Close',
+            data: closes,
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            fill: true,
+            tension: 0.1,
+            pointRadius: 0,
+            borderWidth: 2,
+            yAxisID: 'yPrice',
+        },
+        {
+            label: 'High',
+            data: highs,
+            borderColor: 'rgba(34, 197, 94, 0.5)',
+            borderWidth: 1,
+            pointRadius: 0,
+            borderDash: [5, 5],
+            yAxisID: 'yPrice',
+        },
+        {
+            label: 'Low',
+            data: lows,
+            borderColor: 'rgba(239, 68, 68, 0.5)',
+            borderWidth: 1,
+            pointRadius: 0,
+            borderDash: [5, 5],
+            yAxisID: 'yPrice',
+        }
+    ];
+
+    if (hasPE) {
+        datasets.push({
+            label: 'P/E',
+            data: peValues,
+            borderColor: 'rgb(251, 191, 36)',
+            backgroundColor: 'rgba(251, 191, 36, 0.1)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.1,
+            yAxisID: 'yPE',
+            borderDash: [3, 3],
+        });
+        datasets.push({
+            label: 'EPS (TTM)',
+            data: epsValues,
+            borderColor: 'rgb(168, 85, 247)',
+            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.1,
+            yAxisID: 'yEPS',
+        });
+    }
+
+    const scales = {
+        x: {
+            ticks: { color: '#9ca3af', maxTicksLimit: 12 },
+            grid: { color: 'rgba(75, 85, 99, 0.3)' }
+        },
+        yPrice: {
+            type: 'linear',
+            position: 'left',
+            ticks: { color: '#9ca3af' },
+            grid: { color: 'rgba(75, 85, 99, 0.3)' },
+            title: { display: true, text: 'Price', color: '#9ca3af' },
+        },
+    };
+
+    if (hasPE) {
+        scales.yPE = {
+            type: 'linear',
+            position: 'right',
+            ticks: { color: 'rgb(251, 191, 36)' },
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'P/E', color: 'rgb(251, 191, 36)' },
+        };
+        scales.yEPS = {
+            type: 'linear',
+            position: 'right',
+            ticks: { color: 'rgb(168, 85, 247)' },
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'EPS', color: 'rgb(168, 85, 247)' },
+            // Offset so it doesn't overlap with P/E axis
+        };
+    }
+
     priceChart = new Chart(ctx, {
         type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Close',
-                    data: closes,
-                    borderColor: 'rgb(59, 130, 246)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    fill: true,
-                    tension: 0.1,
-                    pointRadius: 0,
-                    borderWidth: 2,
-                },
-                {
-                    label: 'High',
-                    data: highs,
-                    borderColor: 'rgba(34, 197, 94, 0.5)',
-                    borderWidth: 1,
-                    pointRadius: 0,
-                    borderDash: [5, 5],
-                },
-                {
-                    label: 'Low',
-                    data: lows,
-                    borderColor: 'rgba(239, 68, 68, 0.5)',
-                    borderWidth: 1,
-                    pointRadius: 0,
-                    borderDash: [5, 5],
-                }
-            ]
-        },
+        data: { labels, datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -247,18 +320,21 @@ function buildChart(records, isDaily, symbol) {
                     text: `${symbol} Price History`,
                     color: '#e5e7eb',
                     font: { size: 16 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label;
+                            const val = context.parsed.y;
+                            if (val == null) return null;
+                            if (label === 'P/E') return `P/E: ${val.toFixed(2)}`;
+                            if (label === 'EPS (TTM)') return `EPS: $${val.toFixed(2)}`;
+                            return `${label}: $${val.toFixed(2)}`;
+                        }
+                    }
                 }
             },
-            scales: {
-                x: {
-                    ticks: { color: '#9ca3af', maxTicksLimit: 12 },
-                    grid: { color: 'rgba(75, 85, 99, 0.3)' }
-                },
-                y: {
-                    ticks: { color: '#9ca3af' },
-                    grid: { color: 'rgba(75, 85, 99, 0.3)' }
-                }
-            }
+            scales,
         }
     });
 }
