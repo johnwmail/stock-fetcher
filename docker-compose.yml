@@ -18,14 +18,17 @@ x-common: &common
     start_period: 5s
 
 services:
+  # Published image (use: docker compose --profile prod up -d)
   stock-fetcher:
     <<: *common
     image: ghcr.io/johnwmail/stock-fetcher:latest
     container_name: stock-fetcher
     ports:
       - "8080:8080"
+    profiles:
+      - prod
 
-  # Local build (use: docker compose --profile local up stock-fetcher-local -d)
+  # Local build (use: docker compose --profile local up -d)
   stock-fetcher-local:
     <<: *common
     build:
