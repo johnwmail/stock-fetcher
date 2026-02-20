@@ -28,8 +28,8 @@ PORT=3000 ./stock-fetcher    # starts on :3000
 # Using published image
 docker compose up -d
 
-# Local build
-docker compose --profile local up stock-fetcher-local -d
+# Build from source
+docker compose up -d --build
 ```
 
 Cache is persisted in a named volume (`cache-data` → `/data/cache.db`).

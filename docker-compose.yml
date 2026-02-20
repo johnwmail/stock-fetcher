@@ -1,43 +1,30 @@
-x-common: &common
-  ports:
-    - "8080:8080"
-  environment:
-    - TZ=UTC
-  user: "8080:8080"
-  read_only: true
-  volumes:
-    - cache-data:/data
-  security_opt:
-    - no-new-privileges:true
-  cap_drop:
-    - all
-  restart: unless-stopped
-  healthcheck:
-    test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
-    interval: 30s
-    timeout: 10s
-    retries: 3
-    start_period: 5s
-
 services:
-  # Published image (use: docker compose --profile prod up -d)
+  # Build form source (use: docker compose up -d --build)
   stock-fetcher:
-    <<: *common
     image: ghcr.io/johnwmail/stock-fetcher:latest
-    container_name: stock-fetcher
-    profiles:
-      - prod
-
-  # Local build (use: docker compose --profile local up -d)
-  stock-fetcher-local:
-    <<: *common
     build:
       context: .
       dockerfile: Dockerfile
-    image: stock-fetcher:local
-    container_name: stock-fetcher-local
-    profiles:
-      - local
+    container_name: stock-fetcher
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=UTC
+    user: "8080:8080"
+    read_only: true
+    volumes:
+      - cache-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - all
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
 
 volumes:
   cache-data:
