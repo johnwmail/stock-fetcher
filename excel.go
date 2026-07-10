@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -37,6 +38,11 @@ func GenerateExcel(params ExcelParams) (*excelize.File, error) {
 		NumFmt: 4, // #,##0.00
 	})
 
+	// Style for negative values (light red background)
+	negStyle, _ := f.NewStyle(&excelize.Style{
+		Fill: excelize.Fill{Type: "pattern", Color: []string{"FFC7CE"}, Pattern: 1},
+	})
+
 	// Add metadata
 	setCell(f, sheetName, 1, 1, "Symbol:")
 	setCell(f, sheetName, 2, 1, params.Symbol)
@@ -52,9 +58,9 @@ func GenerateExcel(params ExcelParams) (*excelize.File, error) {
 	row := 6
 
 	if params.PeriodData != nil {
-		row = writePeriodData(f, sheetName, row, params.PeriodData, params.IncludePE, headerStyle)
+		row = writePeriodData(f, sheetName, row, params.PeriodData, params.IncludePE, headerStyle, negStyle)
 	} else {
-		row = writeDailyData(f, sheetName, row, params.Data, params.IncludePE, headerStyle, numberStyle)
+		row = writeDailyData(f, sheetName, row, params.Data, params.IncludePE, headerStyle, numberStyle, negStyle)
 	}
 
 	// Auto-fit columns
@@ -68,7 +74,7 @@ func GenerateExcel(params ExcelParams) (*excelize.File, error) {
 }
 
 // writeDailyData writes daily stock data to Excel
-func writeDailyData(f *excelize.File, sheet string, startRow int, data []StockData, includePE bool, headerStyle, numberStyle int) int {
+func writeDailyData(f *excelize.File, sheet string, startRow int, data []StockData, includePE bool, headerStyle, numberStyle, negStyle int) int {
 	headers := []string{"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange"}
 	if includePE {
 		headers = append(headers, "PE")
@@ -88,8 +94,8 @@ func writeDailyData(f *excelize.File, sheet string, startRow int, data []StockDa
 		setCellNum(f, sheet, 4, startRow, d.Low, numberStyle)
 		setCellNum(f, sheet, 5, startRow, d.Close, numberStyle)
 		setCell(f, sheet, 6, startRow, d.Volume)
-		setCell(f, sheet, 7, startRow, d.Change)
-		setCell(f, sheet, 8, startRow, d.HChange)
+		setChangeCell(f, sheet, 7, startRow, d.Change, negStyle)
+		setChangeCell(f, sheet, 8, startRow, d.HChange, negStyle)
 		if includePE {
 			setCell(f, sheet, 9, startRow, d.PE)
 		}
@@ -99,7 +105,7 @@ func writeDailyData(f *excelize.File, sheet string, startRow int, data []StockDa
 }
 
 // writePeriodData writes period aggregated data to Excel
-func writePeriodData(f *excelize.File, sheet string, startRow int, data []PeriodData, includePE bool, headerStyle int) int {
+func writePeriodData(f *excelize.File, sheet string, startRow int, data []PeriodData, includePE bool, headerStyle, negStyle int) int {
 	headers := []string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange"}
 	if includePE {
 		headers = append(headers, "PE")
@@ -131,9 +137,9 @@ func writePeriodData(f *excelize.File, sheet string, startRow int, data []Period
 		col++
 		setCell(f, sheet, col, startRow, p.Volume)
 		col++
-		setCell(f, sheet, col, startRow, p.Change)
+		setChangeCell(f, sheet, col, startRow, p.Change, negStyle)
 		col++
-		setCell(f, sheet, col, startRow, p.HChange)
+		setChangeCell(f, sheet, col, startRow, p.HChange, negStyle)
 		col++
 		if includePE {
 			setCell(f, sheet, col, startRow, p.PE)
@@ -175,4 +181,22 @@ func setCellNum(f *excelize.File, sheet string, col, row int, value string, styl
 func parseFloatStr(s string) float64 {
 	v, _ := strconv.ParseFloat(s, 64)
 	return v
+}
+
+func setChangeCell(f *excelize.File, sheet string, col, row int, value string, negStyle int) {
+	cell, _ := excelize.CoordinatesToCellName(col, row)
+	_ = f.SetCellValue(sheet, cell, value)
+	if isNegPct(value) {
+		_ = f.SetCellStyle(sheet, cell, cell, negStyle)
+	}
+}
+
+func isNegPct(s string) bool {
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, "%")
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return false
+	}
+	return v < 0
 }
