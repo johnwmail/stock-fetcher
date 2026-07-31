@@ -10,7 +10,6 @@ services:
       - "8080:8080"
     environment:
       - TZ=UTC
-    user: "8080:8080"
     read_only: true
     volumes:
       - cache-data:/data
