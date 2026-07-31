@@ -30,37 +30,44 @@ func GenerateExcel(params ExcelParams) (*excelize.File, error) {
 	headerStyle, _ := f.NewStyle(&excelize.Style{
 		Font:      &excelize.Font{Bold: true, Color: "FFFFFF"},
 		Fill:      excelize.Fill{Type: "pattern", Color: []string{"4472C4"}, Pattern: 1},
-		Alignment: &excelize.Alignment{Horizontal: "center"},
+		Alignment: &excelize.Alignment{Horizontal: "right"},
 	})
 
-	// Style for numbers
+	// Style for right-aligned text
+	rightAlignStyle, _ := f.NewStyle(&excelize.Style{
+		Alignment: &excelize.Alignment{Horizontal: "right"},
+	})
+
+	// Style for numbers (right-aligned)
 	numberStyle, _ := f.NewStyle(&excelize.Style{
-		NumFmt: 4, // #,##0.00
+		NumFmt:    4, // #,##0.00
+		Alignment: &excelize.Alignment{Horizontal: "right"},
 	})
 
-	// Style for negative values (light red background)
+	// Style for negative values (light red background, right-aligned)
 	negStyle, _ := f.NewStyle(&excelize.Style{
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"FFC7CE"}, Pattern: 1},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"FFC7CE"}, Pattern: 1},
+		Alignment: &excelize.Alignment{Horizontal: "right"},
 	})
 
 	// Add metadata
-	setCell(f, sheetName, 1, 1, "Symbol:")
-	setCell(f, sheetName, 2, 1, params.Symbol)
-	setCell(f, sheetName, 1, 2, "Company:")
-	setCell(f, sheetName, 2, 2, params.CompanyName)
-	setCell(f, sheetName, 1, 3, "Period:")
-	setCell(f, sheetName, 2, 3, params.Period)
+	setCell(f, sheetName, 1, 1, "Symbol:", rightAlignStyle)
+	setCell(f, sheetName, 2, 1, params.Symbol, rightAlignStyle)
+	setCell(f, sheetName, 1, 2, "Company:", rightAlignStyle)
+	setCell(f, sheetName, 2, 2, params.CompanyName, rightAlignStyle)
+	setCell(f, sheetName, 1, 3, "Period:", rightAlignStyle)
+	setCell(f, sheetName, 2, 3, params.Period, rightAlignStyle)
 	if params.IncludePE {
-		setCell(f, sheetName, 1, 4, "TTM EPS:")
-		setCell(f, sheetName, 2, 4, params.TTMEPS)
+		setCell(f, sheetName, 1, 4, "TTM EPS:", rightAlignStyle)
+		setCell(f, sheetName, 2, 4, params.TTMEPS, rightAlignStyle)
 	}
 
 	row := 6
 
 	if params.PeriodData != nil {
-		row = writePeriodData(f, sheetName, row, params.PeriodData, params.IncludePE, headerStyle, negStyle)
+		row = writePeriodData(f, sheetName, row, params.PeriodData, params.IncludePE, headerStyle, negStyle, rightAlignStyle)
 	} else {
-		row = writeDailyData(f, sheetName, row, params.Data, params.IncludePE, headerStyle, numberStyle, negStyle)
+		row = writeDailyData(f, sheetName, row, params.Data, params.IncludePE, headerStyle, numberStyle, negStyle, rightAlignStyle)
 	}
 
 	// Auto-fit columns
@@ -74,7 +81,7 @@ func GenerateExcel(params ExcelParams) (*excelize.File, error) {
 }
 
 // writeDailyData writes daily stock data to Excel
-func writeDailyData(f *excelize.File, sheet string, startRow int, data []StockData, includePE bool, headerStyle, numberStyle, negStyle int) int {
+func writeDailyData(f *excelize.File, sheet string, startRow int, data []StockData, includePE bool, headerStyle, numberStyle, negStyle, rightAlignStyle int) int {
 	headers := []string{"Date", "Open", "High", "Low", "Close", "Volume", "Change", "HChange"}
 	if includePE {
 		headers = append(headers, "PE")
@@ -82,22 +89,22 @@ func writeDailyData(f *excelize.File, sheet string, startRow int, data []StockDa
 
 	// Write headers
 	for col, h := range headers {
-		setCellWithStyle(f, sheet, col+1, startRow, h, headerStyle)
+		setCell(f, sheet, col+1, startRow, h, headerStyle)
 	}
 	startRow++
 
 	// Write data rows
 	for _, d := range data {
-		setCell(f, sheet, 1, startRow, d.Date)
+		setCell(f, sheet, 1, startRow, d.Date, rightAlignStyle)
 		setCellNum(f, sheet, 2, startRow, d.Open, numberStyle)
 		setCellNum(f, sheet, 3, startRow, d.High, numberStyle)
 		setCellNum(f, sheet, 4, startRow, d.Low, numberStyle)
 		setCellNum(f, sheet, 5, startRow, d.Close, numberStyle)
-		setCell(f, sheet, 6, startRow, d.Volume)
-		setChangeCell(f, sheet, 7, startRow, d.Change, negStyle)
-		setChangeCell(f, sheet, 8, startRow, d.HChange, negStyle)
+		setCell(f, sheet, 6, startRow, d.Volume, rightAlignStyle)
+		setChangeCell(f, sheet, 7, startRow, d.Change, negStyle, rightAlignStyle)
+		setChangeCell(f, sheet, 8, startRow, d.HChange, negStyle, rightAlignStyle)
 		if includePE {
-			setCell(f, sheet, 9, startRow, d.PE)
+			setCell(f, sheet, 9, startRow, d.PE, rightAlignStyle)
 		}
 		startRow++
 	}
@@ -105,7 +112,7 @@ func writeDailyData(f *excelize.File, sheet string, startRow int, data []StockDa
 }
 
 // writePeriodData writes period aggregated data to Excel
-func writePeriodData(f *excelize.File, sheet string, startRow int, data []PeriodData, includePE bool, headerStyle, negStyle int) int {
+func writePeriodData(f *excelize.File, sheet string, startRow int, data []PeriodData, includePE bool, headerStyle, negStyle, rightAlignStyle int) int {
 	headers := []string{"Period", "Start", "End", "Open", "High", "Low", "Close", "Volume", "Change", "HChange"}
 	if includePE {
 		headers = append(headers, "PE")
@@ -114,58 +121,53 @@ func writePeriodData(f *excelize.File, sheet string, startRow int, data []Period
 
 	// Write headers
 	for col, h := range headers {
-		setCellWithStyle(f, sheet, col+1, startRow, h, headerStyle)
+		setCell(f, sheet, col+1, startRow, h, headerStyle)
 	}
 	startRow++
 
 	// Write data rows
 	for _, p := range data {
 		col := 1
-		setCell(f, sheet, col, startRow, p.Period)
+		setCell(f, sheet, col, startRow, p.Period, rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, p.StartDate)
+		setCell(f, sheet, col, startRow, p.StartDate, rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, p.EndDate)
+		setCell(f, sheet, col, startRow, p.EndDate, rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, parseFloatStr(p.Open))
+		setCell(f, sheet, col, startRow, parseFloatStr(p.Open), rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, parseFloatStr(p.High))
+		setCell(f, sheet, col, startRow, parseFloatStr(p.High), rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, parseFloatStr(p.Low))
+		setCell(f, sheet, col, startRow, parseFloatStr(p.Low), rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, parseFloatStr(p.Close))
+		setCell(f, sheet, col, startRow, parseFloatStr(p.Close), rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, p.Volume)
+		setCell(f, sheet, col, startRow, p.Volume, rightAlignStyle)
 		col++
-		setChangeCell(f, sheet, col, startRow, p.Change, negStyle)
+		setChangeCell(f, sheet, col, startRow, p.Change, negStyle, rightAlignStyle)
 		col++
-		setChangeCell(f, sheet, col, startRow, p.HChange, negStyle)
+		setChangeCell(f, sheet, col, startRow, p.HChange, negStyle, rightAlignStyle)
 		col++
 		if includePE {
-			setCell(f, sheet, col, startRow, p.PE)
+			setCell(f, sheet, col, startRow, p.PE, rightAlignStyle)
 			col++
 		}
-		setCell(f, sheet, col, startRow, p.Days)
+		setCell(f, sheet, col, startRow, p.Days, rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop2Pct.Close, p.Drop2Pct.Low))
+		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop2Pct.Close, p.Drop2Pct.Low), rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop3Pct.Close, p.Drop3Pct.Low))
+		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop3Pct.Close, p.Drop3Pct.Low), rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop4Pct.Close, p.Drop4Pct.Low))
+		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop4Pct.Close, p.Drop4Pct.Low), rightAlignStyle)
 		col++
-		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop5Pct.Close, p.Drop5Pct.Low))
+		setCell(f, sheet, col, startRow, fmt.Sprintf("%d/%d", p.Drop5Pct.Close, p.Drop5Pct.Low), rightAlignStyle)
 		startRow++
 	}
 	return startRow
 }
 
 // Helper functions
-func setCell(f *excelize.File, sheet string, col, row int, value interface{}) {
-	cell, _ := excelize.CoordinatesToCellName(col, row)
-	_ = f.SetCellValue(sheet, cell, value)
-}
-
-func setCellWithStyle(f *excelize.File, sheet string, col, row int, value interface{}, style int) {
+func setCell(f *excelize.File, sheet string, col, row int, value interface{}, style int) {
 	cell, _ := excelize.CoordinatesToCellName(col, row)
 	_ = f.SetCellValue(sheet, cell, value)
 	_ = f.SetCellStyle(sheet, cell, cell, style)
@@ -183,11 +185,13 @@ func parseFloatStr(s string) float64 {
 	return v
 }
 
-func setChangeCell(f *excelize.File, sheet string, col, row int, value string, negStyle int) {
+func setChangeCell(f *excelize.File, sheet string, col, row int, value string, negStyle, rightAlignStyle int) {
 	cell, _ := excelize.CoordinatesToCellName(col, row)
 	_ = f.SetCellValue(sheet, cell, value)
 	if isNegPct(value) {
 		_ = f.SetCellStyle(sheet, cell, cell, negStyle)
+	} else {
+		_ = f.SetCellStyle(sheet, cell, cell, rightAlignStyle)
 	}
 }
 
