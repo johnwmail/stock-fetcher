@@ -75,3 +75,22 @@ func TestReverseData(t *testing.T) {
 		})
 	}
 }
+
+func TestSourceHasPE(t *testing.T) {
+	tests := []struct {
+		source   string
+		expected bool
+	}{
+		{SourceMacrotrends, true},
+		{SourceEDGAR, true},
+		{SourceYahoo, false},
+		{"unknown", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		if got := sourceHasPE(tt.source); got != tt.expected {
+			t.Errorf("sourceHasPE(%q) = %v, want %v", tt.source, got, tt.expected)
+		}
+	}
+}

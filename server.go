@@ -213,7 +213,7 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch data
 	useYahoo := isHKStock(symbol)
-	data, ttmEPS, companyName, includePE, err := fetchStockData(s.cache, symbol, days, useYahoo)
+	data, ttmEPS, companyName, source, err := fetchStockData(s.cache, symbol, days, useYahoo)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch data: %v", err))
 		return
@@ -224,30 +224,34 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	includePE := sourceHasPE(source)
+
 	// Determine data source, provider URL, and currency
-	dataSource := "macrotrends"
-	var providerURL string
 	upperSymbol := strings.ToUpper(symbol)
 	currency := "USD"
 	if useYahoo {
 		currency = "HKD"
 	}
-	if useYahoo || !includePE {
-		dataSource = "yahoo"
-		providerURL = fmt.Sprintf("https://finance.yahoo.com/quote/%s", upperSymbol)
-	} else {
+
+	var providerURL string
+	switch source {
+	case SourceMacrotrends:
 		slug := companyName
 		if slug == "" {
 			slug = strings.ToLower(symbol)
 		}
 		providerURL = fmt.Sprintf("https://www.macrotrends.net/stocks/charts/%s/%s/stock-price-history", upperSymbol, slug)
+	case SourceEDGAR:
+		providerURL = fmt.Sprintf("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=%s&type=10-K", upperSymbol)
+	default:
+		providerURL = fmt.Sprintf("https://finance.yahoo.com/quote/%s", upperSymbol)
 	}
 
 	// Build response
 	resp := StockResponse{
 		Symbol:      upperSymbol,
 		CompanyName: formatCompanyName(companyName),
-		DataSource:  dataSource,
+		DataSource:  source,
 		ProviderURL: providerURL,
 		Currency:    currency,
 		PeriodType:  period,
@@ -363,11 +367,13 @@ func (s *Server) handleStockExcel(w http.ResponseWriter, r *http.Request) {
 	useYahoo := isHKStock(symbol)
 
 	// Fetch stock data
-	data, ttmEPS, companyName, includePE, err := fetchStockData(s.cache, symbol, days, useYahoo)
+	data, ttmEPS, companyName, source, err := fetchStockData(s.cache, symbol, days, useYahoo)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	includePE := sourceHasPE(source)
 
 	// Prepare Excel params
 	params := ExcelParams{

@@ -4,7 +4,7 @@ A Go web server that fetches historical stock price data with P/E ratios.
 
 ## Features
 
-- **US Stocks**: Daily prices with historical P/E ratio (via macrotrends.net)
+- **US Stocks**: Daily prices with historical P/E ratio (via macrotrends.net, with SEC EDGAR + Yahoo fallback)
 - **HK Stocks**: Daily prices via Yahoo Finance
 - Period aggregation: weekly, monthly, quarterly, yearly
 - Drop day analysis (2%–5%+ buckets, close-based and low-based)
@@ -78,9 +78,20 @@ Override with `DB_PATH` env var. Set `DB_PATH=none` to disable caching.
 | Stock Type | Source | P/E Ratio |
 |------------|--------|----------|
 | US Stocks | macrotrends.net | ✅ Yes (TTM, historical) |
+| US Stocks (fallback) | SEC EDGAR + Yahoo Finance | ✅ Yes (TTM, historical) |
 | HK Stocks (.HK) | Yahoo Finance | ❌ No |
 
-US stocks automatically fall back to Yahoo Finance if macrotrends fails (e.g., ETFs).
+US stocks are fetched in this order:
+
+1. **macrotrends.net** — prices plus historical P/E (primary)
+2. **SEC EDGAR + Yahoo Finance** — EDGAR provides historical quarterly diluted EPS
+   (no API key required), Yahoo provides prices, and P/E is computed as
+   price ÷ trailing-twelve-month EPS
+3. **Yahoo Finance only** — prices without P/E (e.g., ETFs without EDGAR EPS data)
+
+EDGAR requests use the SEC's fair-access rules (a declared User-Agent and a
+rate limit well below 10 requests/second). Override the default contact with
+`SEC_USER_AGENT`, e.g. `SEC_USER_AGENT="StockFetcher/1.0 (you@example.com)"`.
 
 ## Supported Indices
 

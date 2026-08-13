@@ -21,6 +21,18 @@ type StockData struct {
 	PE      string `json:"pe,omitempty"`
 }
 
+// Data source identifiers stored in the cache and returned to the API layer.
+const (
+	SourceMacrotrends = "macrotrends"
+	SourceEDGAR       = "edgar"
+	SourceYahoo       = "yahoo"
+)
+
+// sourceHasPE reports whether a data source includes historical P/E data.
+func sourceHasPE(source string) bool {
+	return source == SourceMacrotrends || source == SourceEDGAR
+}
+
 // isHKStock checks if the symbol is a Hong Kong stock
 func isHKStock(symbol string) bool {
 	return strings.HasSuffix(strings.ToUpper(symbol), ".HK")
@@ -97,6 +109,42 @@ func fetchUSStock(symbol string, days int) ([]StockData, float64, string, error)
 	return reverseData(data), latestEPS, companyName, nil
 }
 
+// fetchUSStockWithEDGAR fetches US stock prices from Yahoo and computes
+// historical P/E ratios using trailing-twelve-month EPS from SEC EDGAR.
+// EDGAR has no market prices, so Yahoo supplies the OHLCV data.
+func fetchUSStockWithEDGAR(symbol string, days int) ([]StockData, float64, string, error) {
+	peData, err := sharedEDGARFetcher.FetchFundamental(symbol)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to fetch EDGAR EPS data: %w", err)
+	}
+
+	yahoo := NewYahooFetcher()
+	endDate := time.Now()
+	startDate := endDate.AddDate(0, 0, -days)
+
+	yahooData, companyName, err := yahoo.FetchHistoricalData(symbol, startDate, endDate)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to fetch Yahoo price data: %w", err)
+	}
+	if companyName == "" {
+		companyName = peData.CompanyName
+	}
+
+	for i := range yahooData {
+		eps := peData.GetEPSForDate(yahooData[i].Date)
+		if eps <= 0 {
+			continue
+		}
+
+		closePrice := parseFloat(yahooData[i].Close)
+		if closePrice > 0 {
+			yahooData[i].PE = fmt.Sprintf("%.2f", closePrice/eps)
+		}
+	}
+
+	return reverseData(yahooData), peData.GetLatestTTM_EPS(), companyName, nil
+}
+
 // fetchHKStock fetches HK stock data from Yahoo (no P/E)
 func fetchHKStock(symbol string, days int) ([]StockData, string, error) {
 	fetcher := NewYahooFetcher()
@@ -126,32 +174,40 @@ func formatCompanyName(slug string) string {
 	return strings.Join(words, " ")
 }
 
-// fetchFromProvider fetches stock data directly from the upstream provider
-func fetchFromProvider(symbol string, days int, useYahoo bool) ([]StockData, float64, string, bool, error) {
-	var data []StockData
-	var companyName string
-	var ttmEPS float64
-	var err error
-	includePE := false
-
+// fetchFromProvider fetches stock data directly from the upstream provider.
+// It returns the data source identifier so callers can decide whether the
+// data includes historical P/E.
+func fetchFromProvider(symbol string, days int, useYahoo bool) ([]StockData, float64, string, string, error) {
 	if useYahoo {
-		data, companyName, err = fetchHKStock(symbol, days)
-	} else {
-		data, ttmEPS, companyName, err = fetchUSStock(symbol, days)
-		if err != nil {
-			// Fallback to Yahoo Finance for ETFs or unsupported stocks
-			data, companyName, err = fetchHKStock(symbol, days)
-		} else {
-			includePE = true
-		}
+		data, companyName, err := fetchHKStock(symbol, days)
+		return data, 0, companyName, SourceYahoo, err
 	}
 
-	return data, ttmEPS, companyName, includePE, err
+	// Primary: macrotrends provides both prices and historical P/E.
+	data, ttmEPS, companyName, err := fetchUSStock(symbol, days)
+	if err == nil {
+		return data, ttmEPS, companyName, SourceMacrotrends, nil
+	}
+
+	// Fallback: EDGAR provides historical EPS while Yahoo provides prices.
+	data, ttmEPS, companyName, err = fetchUSStockWithEDGAR(symbol, days)
+	if err == nil {
+		return data, ttmEPS, companyName, SourceEDGAR, nil
+	}
+
+	// Last resort: Yahoo prices only (no P/E) for ETFs or unsupported stocks.
+	data, companyName, err = fetchHKStock(symbol, days)
+	if err != nil {
+		return nil, 0, "", "", err
+	}
+	return data, 0, companyName, SourceYahoo, nil
 }
 
 // fetchStockData fetches stock data, using cache when available.
 // The cache stores raw OHLCV+PE; Change/HChange are recomputed on read.
-func fetchStockData(cache *Cache, symbol string, days int, useYahoo bool) ([]StockData, float64, string, bool, error) {
+// The returned source string is one of SourceMacrotrends, SourceEDGAR, or
+// SourceYahoo.
+func fetchStockData(cache *Cache, symbol string, days int, useYahoo bool) ([]StockData, float64, string, string, error) {
 	symbolUpper := strings.ToUpper(symbol)
 	startDate := time.Now().AddDate(0, 0, -days).Format("2006-01-02")
 	today := time.Now().Format("2006-01-02")
@@ -163,8 +219,7 @@ func fetchStockData(cache *Cache, symbol string, days int, useYahoo bool) ([]Sto
 		if meta != nil && meta.IsFresh() && meta.CoversRange(startDate) {
 			data, err := cache.GetDailyPrices(symbolUpper, startDate, today)
 			if err == nil && len(data) > 0 {
-				includePE := meta.Source == "macrotrends"
-				return data, meta.TTMEPS, meta.CompanyName, includePE, nil
+				return data, meta.TTMEPS, meta.CompanyName, meta.Source, nil
 			}
 		}
 
@@ -179,27 +234,21 @@ func fetchStockData(cache *Cache, symbol string, days int, useYahoo bool) ([]Sto
 			}
 		}
 
-		data, ttmEPS, companyName, includePE, err := fetchFromProvider(symbol, fetchDays, useYahoo)
+		data, ttmEPS, companyName, source, err := fetchFromProvider(symbol, fetchDays, useYahoo)
 		if err != nil {
 			// Provider failed — try serving stale cache if available
 			if meta != nil {
 				staleData, cacheErr := cache.GetDailyPrices(symbolUpper, startDate, today)
 				if cacheErr == nil && len(staleData) > 0 {
-					incPE := meta.Source == "macrotrends"
-					return staleData, meta.TTMEPS, meta.CompanyName, incPE, nil
+					return staleData, meta.TTMEPS, meta.CompanyName, meta.Source, nil
 				}
 			}
-			return nil, 0, "", false, err
+			return nil, 0, "", "", err
 		}
 
 		// Store new data in cache
 		if len(data) > 0 {
 			_ = cache.StoreDailyPrices(symbolUpper, data)
-
-			source := "yahoo"
-			if includePE {
-				source = "macrotrends"
-			}
 
 			// Determine date range in cache
 			earliestDate := data[len(data)-1].Date // data is newest-first
@@ -222,11 +271,11 @@ func fetchStockData(cache *Cache, symbol string, days int, useYahoo bool) ([]Sto
 		// Serve full range from cache (includes old + new data)
 		cachedData, cacheErr := cache.GetDailyPrices(symbolUpper, startDate, today)
 		if cacheErr == nil && len(cachedData) > 0 {
-			return cachedData, ttmEPS, companyName, includePE, nil
+			return cachedData, ttmEPS, companyName, source, nil
 		}
 
 		// Fallback: return provider data directly
-		return data, ttmEPS, companyName, includePE, nil
+		return data, ttmEPS, companyName, source, nil
 	}
 
 	// No cache — fetch directly from provider
