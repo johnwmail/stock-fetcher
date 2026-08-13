@@ -2,13 +2,11 @@ import type { StockData } from './types';
 
 export const SourceAuto = 'auto';
 export const SourceMacrotrends = 'macrotrends';
-export const SourceEDGAR = 'edgar';
 export const SourceYahoo = 'yahoo';
 
 export type DataSource =
   | typeof SourceAuto
   | typeof SourceMacrotrends
-  | typeof SourceEDGAR
   | typeof SourceYahoo;
 
 // Checks whether a symbol is a Hong Kong stock.
@@ -27,7 +25,7 @@ export function reverseData(data: StockData[]): StockData[] {
 
 // Reports whether a data source includes historical P/E data.
 export function sourceHasPE(source: string): boolean {
-  return source === SourceMacrotrends || source === SourceEDGAR;
+  return source === SourceMacrotrends;
 }
 
 // Converts a user-supplied source value into a known source identifier.
@@ -38,12 +36,11 @@ export function normalizeSource(raw: string | null | undefined): DataSource {
     case SourceAuto:
       return SourceAuto;
     case SourceMacrotrends:
-    case SourceEDGAR:
     case SourceYahoo:
       return value as DataSource;
     default:
       throw new Error(
-        `invalid source: "${raw}" (use auto, macrotrends, edgar, or yahoo)`,
+        `invalid source: "${raw}" (use auto, macrotrends, or yahoo)`,
       );
   }
 }

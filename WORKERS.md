@@ -12,7 +12,6 @@ This is a TypeScript rewrite of the Go backend for the Cloudflare Workers
 | `src/helpers.ts` | Source/symbol/formatting helpers |
 | `src/providers.ts` | Provider fallback chain and cache orchestration |
 | `src/yahoo.ts` | Yahoo Finance chart API fetcher |
-| `src/edgar.ts` | SEC EDGAR XBRL EPS fetcher |
 | `src/macrotrends.ts` | macrotrends.net P/E + price fetcher |
 | `src/cache.ts` | D1-backed SQLite cache |
 | `src/period.ts` | Period aggregation + drop analysis |
@@ -40,9 +39,9 @@ The worker serves the API on `/api/*` and the frontend on `/`.
 
 ## Data source selection
 
-`GET /api/stock/{symbol}?source=auto|macrotrends|edgar|yahoo`
+`GET /api/stock/{symbol}?source=auto|macrotrends|yahoo`
 
-- `auto` (default) tries macrotrends, then EDGAR, then Yahoo.
+- `auto` (default) tries macrotrends, then Yahoo.
 - HK stocks (`.HK`) only support `auto` and `yahoo`.
 - The `data_source` field in the response reports which provider was used.
 
@@ -72,22 +71,11 @@ The `.github/workflows/deploy-workers.yml` workflow runs typecheck + tests,
 applies D1 migrations, and deploys with `wrangler deploy`. It can also be
 triggered manually from the Actions tab.
 
-## SEC EDGAR fair access
-
-EDGAR requests are serialized at 5 requests/second and use a declared
-User-Agent. Override the contact with the `SEC_USER_AGENT` Worker variable or
-the `SEC_USER_AGENT` env/secret:
-
-```bash
-npx wrangler secret put SEC_USER_AGENT
-# StockFetcher/1.0 (you@example.com)
-```
-
 ## Notes and caveats
 
 - **macrotrends** is Cloudflare-protected and frequently returns `403 Just a
   moment` to non-browser IPs, including Workers egress. Verify it works from
-  your account before relying on it; EDGAR is the reliable free P/E source.
+  your account before relying on it.
 - **Yahoo Finance** is an undocumented endpoint and may rate-limit datacenter
   IPs.
 - Excel generation uses `nodejs_compat` for Node `Buffer` support.

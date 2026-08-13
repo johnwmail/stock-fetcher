@@ -1,7 +1,6 @@
 import type { ProviderResult, StockData } from './types';
 import {
   SourceAuto,
-  SourceEDGAR,
   SourceMacrotrends,
   SourceYahoo,
   daysAgo,
@@ -11,7 +10,6 @@ import {
   toNumber,
 } from './helpers';
 import { MacrotrendsFetcher } from './macrotrends';
-import { fetchEDGARFundamental } from './edgar';
 import { fetchHistoricalData } from './yahoo';
 import { D1Cache, coversRange, isFresh } from './cache';
 
@@ -73,37 +71,6 @@ export async function fetchUSStock(
   return { data: reverseData(data), ttmEPS: latestEPS, companyName };
 }
 
-// Fetches US prices from Yahoo and computes historical P/E using TTM EPS
-// from SEC EDGAR.
-export async function fetchUSStockWithEDGAR(
-  symbol: string,
-  days: number,
-): Promise<{ data: StockData[]; ttmEPS: number; companyName: string }> {
-  const peData = await fetchEDGARFundamental(symbol);
-
-  const endDate = new Date();
-  const startDate = daysAgo(days, endDate);
-
-  const yahoo = await fetchHistoricalData(symbol, startDate, endDate);
-  const companyName = yahoo.companyName || peData.companyName;
-
-  for (const record of yahoo.data) {
-    const eps = peData.getEPSForDate(record.date);
-    if (eps <= 0) continue;
-
-    const closePrice = toNumber(record.close);
-    if (closePrice > 0) {
-      record.pe = (closePrice / eps).toFixed(2);
-    }
-  }
-
-  return {
-    data: reverseData(yahoo.data),
-    ttmEPS: peData.getLatestTTMEPS(),
-    companyName,
-  };
-}
-
 // Fetches HK stock data from Yahoo (no P/E).
 export async function fetchHKStock(
   symbol: string,
@@ -133,10 +100,6 @@ export async function fetchFromProvider(
       const { data, ttmEPS, companyName } = await fetchUSStock(symbol, days);
       return { data, ttmEPS, companyName, source: SourceMacrotrends };
     }
-    case SourceEDGAR: {
-      const { data, ttmEPS, companyName } = await fetchUSStockWithEDGAR(symbol, days);
-      return { data, ttmEPS, companyName, source: SourceEDGAR };
-    }
     case SourceYahoo: {
       const { data, companyName } = await fetchHKStock(symbol, days);
       return { data, ttmEPS: 0, companyName, source: SourceYahoo };
@@ -145,17 +108,10 @@ export async function fetchFromProvider(
       break;
   }
 
-  // SourceAuto: macrotrends first, then EDGAR, then Yahoo.
+  // SourceAuto: macrotrends first, then Yahoo.
   try {
     const result = await fetchUSStock(symbol, days);
     return { ...result, source: SourceMacrotrends };
-  } catch {
-    // fall through to EDGAR
-  }
-
-  try {
-    const result = await fetchUSStockWithEDGAR(symbol, days);
-    return { ...result, source: SourceEDGAR };
   } catch {
     // fall through to Yahoo
   }

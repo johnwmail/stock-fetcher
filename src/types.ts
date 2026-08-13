@@ -32,8 +32,7 @@ export class FundamentalData {
   ) {}
 
   // Returns the latest trailing twelve months EPS.
-  // Macrotrends EPS values are already TTM. EDGAR values are converted to
-  // TTM by buildTTMEPSSeries() before being stored here.
+  // Macrotrends EPS values are already TTM.
   getLatestTTMEPS(): number {
     for (let i = this.historicalData.length - 1; i >= 0; i--) {
       if (this.historicalData[i].eps > 0) {

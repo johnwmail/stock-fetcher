@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   SourceAuto,
-  SourceEDGAR,
   SourceMacrotrends,
   SourceYahoo,
   isHKStock,
@@ -40,7 +39,6 @@ describe('normalizeSource', () => {
     expect(normalizeSource('')).toBe(SourceAuto);
     expect(normalizeSource('auto')).toBe(SourceAuto);
     expect(normalizeSource('AUTO')).toBe(SourceAuto);
-    expect(normalizeSource('edgar')).toBe(SourceEDGAR);
     expect(normalizeSource('yahoo')).toBe(SourceYahoo);
     expect(normalizeSource('macrotrends')).toBe(SourceMacrotrends);
   });
@@ -53,14 +51,12 @@ describe('normalizeSource', () => {
 describe('sourceHasPE', () => {
   it('returns true for PE providers', () => {
     expect(sourceHasPE(SourceMacrotrends)).toBe(true);
-    expect(sourceHasPE(SourceEDGAR)).toBe(true);
     expect(sourceHasPE(SourceYahoo)).toBe(false);
   });
 });
 
 describe('validateSourceForSymbol', () => {
   it('rejects non-Yahoo sources for HK stocks', () => {
-    expect(() => validateSourceForSymbol(SourceEDGAR, '0700.HK')).toThrow(/not supported/);
     expect(() => validateSourceForSymbol(SourceYahoo, '0700.HK')).not.toThrow();
     expect(() => validateSourceForSymbol(SourceMacrotrends, 'AAPL')).not.toThrow();
   });

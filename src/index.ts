@@ -1,5 +1,4 @@
 import {
-  SourceEDGAR,
   SourceMacrotrends,
   SourceYahoo,
   formatCompanyName,
@@ -12,7 +11,6 @@ import {
 import type { DataSource } from './helpers';
 import { isValidPeriod, parsePeriodType, aggregateToPeriods } from './period';
 import { fetchStockData } from './providers';
-import { setSECUserAgent } from './edgar';
 import { generateExcel } from './excel';
 import { getCompanyNamesForSymbols, getIndices } from './data';
 import type { StockResponse } from './types';
@@ -20,7 +18,6 @@ import type { StockResponse } from './types';
 export interface Env {
   DB?: D1Database;
   ASSETS?: Fetcher;
-  SEC_USER_AGENT?: string;
   VERSION?: string;
 }
 
@@ -64,8 +61,6 @@ function providerURL(source: string, symbol: string, companyName: string): strin
       const slug = companyName || symbol.toLowerCase();
       return `https://www.macrotrends.net/stocks/charts/${upper}/${slug}/stock-price-history`;
     }
-    case SourceEDGAR:
-      return `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${upper}&type=10-K`;
     default:
       return `https://finance.yahoo.com/quote/${upper}`;
   }
@@ -106,7 +101,6 @@ async function handleStock(request: Request, env: Env): Promise<Response> {
   }
 
   const useYahoo = isHKStock(symbol);
-  setSECUserAgent(env.SEC_USER_AGENT);
 
   const result = await fetchStockData(env.DB ?? null, symbol, days, useYahoo, source);
   if (result.data.length === 0) {
@@ -169,7 +163,6 @@ async function handleStockExcel(request: Request, env: Env): Promise<Response> {
   }
 
   const useYahoo = isHKStock(symbol);
-  setSECUserAgent(env.SEC_USER_AGENT);
 
   const result = await fetchStockData(env.DB ?? null, symbol, days, useYahoo, source);
   const includePE = sourceHasPE(result.source);
