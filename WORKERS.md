@@ -57,6 +57,18 @@ npx wrangler d1 create stock-fetcher
 Paste the returned `database_id` into `wrangler.toml`, or provide it via the
 `D1_DATABASE_ID` GitHub secret (the deploy workflow replaces the placeholder).
 
+### Look up the D1 database id again
+
+If you already created the database and need its id again:
+
+```bash
+npx wrangler d1 list
+```
+
+The id is shown next to the database name. You can also find it in the
+Cloudflare Dashboard under **Workers & Pages → D1 SQL Database →
+stock-fetcher**.
+
 ### 2. Configure GitHub secrets
 
 | Secret | Description |
