@@ -1,5 +1,10 @@
 # Stock Price Fetcher
 
+> **New:** A TypeScript backend for Cloudflare Workers (`workerd`) is in this
+> repository. See [WORKERS.md](WORKERS.md) for the TS implementation, D1 cache
+> setup, and the Cloudflare deploy workflow. The Go backend below remains as
+> the legacy Docker implementation.
+
 A Go web server that fetches historical stock price data with P/E ratios.
 
 ## Features

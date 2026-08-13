@@ -37,9 +37,22 @@ bootstrap
 *.zip
 *.csv
 *.txt
-*.json
 *.xslx
 cache.db
 cache.db-wal
 cache.db-shm
 
+# Cloudflare Workers / TypeScript
+node_modules/
+.wrangler/
+.dev.vars
+*.log
+
+# Generated JSON is ignored by default, but keep project files.
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!wrangler.json
+!wrangler.jsonc
+!src/data/static-data.json
