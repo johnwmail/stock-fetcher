@@ -20,6 +20,7 @@ async function fetchStock() {
     const symbol = document.getElementById('symbol').value.trim().toUpperCase();
     const days = document.getElementById('days').value || 1825;
     const period = document.getElementById('period').value;
+    const source = document.getElementById('source').value || 'auto';
 
     if (!symbol) {
         showError('Please enter a stock symbol');
@@ -31,7 +32,7 @@ async function fetchStock() {
     hideResults();
 
     try {
-        const response = await fetch(`${API_BASE}/api/stock/${symbol}?days=${days}&period=${period}`);
+        const response = await fetch(`${API_BASE}/api/stock/${symbol}?days=${days}&period=${period}&source=${encodeURIComponent(source)}`);
         const result = await response.json();
 
         if (!result.success) {
@@ -442,9 +443,10 @@ function exportExcel() {
     const symbol = currentData.symbol;
     const period = currentData.period_type;
     const days = document.getElementById('days').value || 1825;
+    const source = document.getElementById('source').value || 'auto';
     
     // Trigger download via server endpoint
-    const url = `${API_BASE}/api/stock-excel/${symbol}?days=${days}&period=${period}`;
+    const url = `${API_BASE}/api/stock-excel/${symbol}?days=${days}&period=${period}&source=${encodeURIComponent(source)}`;
     window.location.href = url;
 }
 

@@ -28,7 +28,7 @@
 
         <!-- Search Form -->
         <div class="bg-gray-800 rounded-lg p-6 mb-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <!-- Symbol Input -->
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-2">Symbol</label>
@@ -55,6 +55,18 @@
                         <option value="monthly" selected>Monthly</option>
                         <option value="quarterly">Quarterly</option>
                         <option value="yearly">Yearly</option>
+                    </select>
+                </div>
+
+                <!-- Data Source Select -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Data Source</label>
+                    <select id="source"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white">
+                        <option value="auto" selected>Auto</option>
+                        <option value="macrotrends">Macrotrends</option>
+                        <option value="edgar">SEC EDGAR</option>
+                        <option value="yahoo">Yahoo Finance</option>
                     </select>
                 </div>
 

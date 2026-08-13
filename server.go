@@ -189,14 +189,15 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse query parameters
+	query := r.URL.Query()
 	days := 1825
-	if d := r.URL.Query().Get("days"); d != "" {
+	if d := query.Get("days"); d != "" {
 		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 {
 			days = parsed
 		}
 	}
 
-	period := r.URL.Query().Get("period")
+	period := query.Get("period")
 	if period == "" {
 		period = "monthly"
 	}
@@ -211,9 +212,20 @@ func (s *Server) handleStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse and validate data source
+	source, err := normalizeSource(query.Get("source"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateSourceForSymbol(source, symbol); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// Fetch data
 	useYahoo := isHKStock(symbol)
-	data, ttmEPS, companyName, source, err := fetchStockData(s.cache, symbol, days, useYahoo)
+	data, ttmEPS, companyName, source, err := fetchStockData(s.cache, symbol, days, useYahoo, source)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch data: %v", err))
 		return
@@ -363,11 +375,22 @@ func (s *Server) handleStockExcel(w http.ResponseWriter, r *http.Request) {
 		period = "monthly"
 	}
 
+	// Parse and validate data source
+	source, err := normalizeSource(query.Get("source"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateSourceForSymbol(source, symbol); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// Determine data source
 	useYahoo := isHKStock(symbol)
 
 	// Fetch stock data
-	data, ttmEPS, companyName, source, err := fetchStockData(s.cache, symbol, days, useYahoo)
+	data, ttmEPS, companyName, source, err := fetchStockData(s.cache, symbol, days, useYahoo, source)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

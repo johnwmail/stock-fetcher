@@ -51,12 +51,18 @@ Cache is persisted in a named volume (`cache-data` → `/data/cache.db`).
 |-------|---------|--------|
 | `days` | 1825 (5 years) | Number of days of historical data |
 | `period` | monthly | `daily`, `weekly`, `monthly`, `quarterly`, `yearly` |
+| `source` | auto | `auto`, `macrotrends`, `edgar`, `yahoo` |
+
+`source` controls which provider is used. `auto` uses the fallback chain
+(macrotrends → EDGAR → Yahoo). A specific source forces only that provider.
+HK stocks (`.HK`) only support `auto` and `yahoo`.
 
 ### Examples
 
 ```bash
 curl localhost:8080/api/stock/AAPL
 curl localhost:8080/api/stock/AAPL?days=90\&period=daily
+curl localhost:8080/api/stock/AAPL?source=edgar
 curl localhost:8080/api/stock/0700.HK?days=365
 curl localhost:8080/api/indices/dow
 ```
