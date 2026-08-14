@@ -1,44 +1,47 @@
-# Build stage
-FROM golang:1.24-alpine AS builder
+# Development/runtime container for the Cloudflare Workers (TypeScript) app.
+#
+# This image runs the Worker locally with `wrangler dev` (workerd) inside the
+# container. It is useful for running the TS backend on Docker hosts that are
+# not the Cloudflare network. Production deploys still go through
+# `wrangler deploy` / GitHub Actions.
+#
+# Use a glibc-based image: Cloudflare's workerd-linux-64 binary is not
+# compatible with musl-based images such as node:alpine.
+FROM node:24-slim
 
-WORKDIR /app
-
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY *.go ./
-COPY web/ ./web/
-
+# Build-time metadata, injected by the container publishing workflow.
 ARG VERSION=vDev
 ARG BUILD_TIME=timeless
 ARG COMMIT_HASH=sha-unknown
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-w -s -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.CommitHash=${COMMIT_HASH}" \
-    -o stock-fetcher .
+LABEL org.opencontainers.image.title="stock-fetcher" \
+      org.opencontainers.image.description="Cloudflare Workers (TypeScript) stock data service" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_TIME}" \
+      org.opencontainers.image.revision="${COMMIT_HASH}" \
+      org.opencontainers.image.source="https://github.com/johnwmail/stock-fetcher"
 
-# Runtime stage
-FROM alpine:3.21
-
-RUN apk --no-cache add ca-certificates tzdata
-
-RUN addgroup -g 8080 appgroup && \
-    adduser -D -u 8080 -G appgroup appuser
+# CA certificates are required for workerd's outbound HTTPS fetches.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Create /data for cache volume
-RUN mkdir -p /data && chown appuser:appgroup /data
+# Install dependencies first so they are cached separately.
+COPY package.json package-lock.json ./
+RUN npm ci
 
-COPY --from=builder /app/stock-fetcher .
+# Copy the rest of the project.
+COPY . .
 
-USER 8080:8080
+ENV NODE_ENV=production
+ENV WRANGLER_SEND_METRICS=false
+# Force non-interactive Wrangler prompts (skip D1 migration confirmation).
+ENV CI=true
 
 EXPOSE 8080
 
-ENV PORT=8080
-
-# /data is auto-detected by the app for cache.db
-VOLUME ["/data"]
-
-CMD ["./stock-fetcher"]
+# Local D1 state lives under /app/.wrangler; mount a volume there to persist
+# the SQLite cache between container restarts.
+CMD ["sh", "-c", "npx wrangler d1 migrations apply stock-fetcher --local < /dev/null && exec npx wrangler dev --local --ip 0.0.0.0 --port 8080"]

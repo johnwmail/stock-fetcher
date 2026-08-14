@@ -1,4 +1,4 @@
-name: Build Container
+name: Build and Publish Container
 
 on:
   push:
@@ -36,24 +36,24 @@ jobs:
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
+
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # Manual trigger - use short SHA only, no latest
-            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}" >> $GITHUB_OUTPUT
-            echo "version=${SHORT_SHA}" >> $GITHUB_OUTPUT
+            # Manual trigger - use short SHA only, no latest.
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+            echo "version=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           else
-            # Tag push - use version (without 'v') and latest
+            # Tag push - use version (without 'v') and latest.
             VERSION="${{ github.ref_name }}"
             VERSION_NUM="${VERSION#v}"
-            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION_NUM}" >> $GITHUB_OUTPUT
-            echo "version=${VERSION_NUM}" >> $GITHUB_OUTPUT
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION_NUM}" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION_NUM}" >> "$GITHUB_OUTPUT"
           fi
-          
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "build_time=${BUILD_TIME}" >> $GITHUB_OUTPUT
+
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "build_time=${BUILD_TIME}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -68,16 +68,16 @@ jobs:
 
       - name: Image summary
         run: |
-          echo "## Container Image Published" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Registry:** ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:** ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ steps.meta.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Build Time:** ${{ steps.meta.outputs.build_time }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Pull command:**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "## Container Image Published" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Registry:** ${{ env.REGISTRY }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Image:** ${{ env.IMAGE_NAME }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Tags:** ${{ steps.meta.outputs.tags }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Version:** ${{ steps.meta.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Commit:** ${{ steps.meta.outputs.short_sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Build Time:** ${{ steps.meta.outputs.build_time }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Pull command:**" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`bash" >> "$GITHUB_STEP_SUMMARY"
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"

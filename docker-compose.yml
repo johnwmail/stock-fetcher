@@ -1,30 +1,16 @@
 services:
-  # Build form source (use: docker compose up -d --build)
   stock-fetcher:
-    image: ghcr.io/johnwmail/stock-fetcher:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: stock-fetcher
+    build: .
+    image: stock-fetcher-workers:latest
+    container_name: stock-fetcher-workers
     ports:
       - "8080:8080"
     environment:
-      - TZ=UTC
-    user: "8080:8080"
-    read_only: true
+      - NODE_ENV=production
+      - WRANGLER_SEND_METRICS=false
     volumes:
-      - cache-data:/data
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - all
+      - wrangler-state:/app/.wrangler
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
 
 volumes:
-  cache-data:
+  wrangler-state:

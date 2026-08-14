@@ -1,0 +1,23 @@
+name = "stock"
+main = "src/index.ts"
+compatibility_date = "2026-08-13"
+compatibility_flags = ["nodejs_compat"]
+
+# Static frontend (web/index.html + web/app.js) is served by Workers Static
+# Assets. The worker handles /api/* first; everything else falls through.
+[assets]
+directory = "./web"
+binding = "ASSETS"
+run_worker_first = true
+
+# D1 provides the SQLite cache. Create the database once with:
+#   wrangler d1 create stock-fetcher
+# and paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "stock-fetcher"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+VERSION = "vDev"

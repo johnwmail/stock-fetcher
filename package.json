@@ -1,0 +1,23 @@
+{
+  "name": "stock-fetcher-workers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Stock Fetcher backend rewritten in TypeScript for Cloudflare Workers (workerd)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260813.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5",
+    "wrangler": "^4.22.0"
+  }
+}
