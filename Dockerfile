@@ -9,6 +9,18 @@
 # compatible with musl-based images such as node:alpine.
 FROM node:24-slim
 
+# Build-time metadata, injected by the container publishing workflow.
+ARG VERSION=vDev
+ARG BUILD_TIME=timeless
+ARG COMMIT_HASH=sha-unknown
+
+LABEL org.opencontainers.image.title="stock-fetcher" \
+      org.opencontainers.image.description="Cloudflare Workers (TypeScript) stock data service" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_TIME}" \
+      org.opencontainers.image.revision="${COMMIT_HASH}" \
+      org.opencontainers.image.source="https://github.com/johnwmail/stock-fetcher"
+
 # CA certificates are required for workerd's outbound HTTPS fetches.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
