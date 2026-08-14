@@ -1,0 +1,16 @@
+services:
+  stock-fetcher:
+    build: .
+    image: stock-fetcher-workers:latest
+    container_name: stock-fetcher-workers
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - WRANGLER_SEND_METRICS=false
+    volumes:
+      - wrangler-state:/app/.wrangler
+    restart: unless-stopped
+
+volumes:
+  wrangler-state:

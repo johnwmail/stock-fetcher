@@ -8,17 +8,22 @@ on:
       - 'src/**'
       - 'web/**'
       - 'wrangler.toml'
+      - 'tsconfig.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'migrations/**'
+      - '.github/workflows/deploy-workers.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'wrangler.toml'
+      - 'tsconfig.json'
       - 'package.json'
       - 'package-lock.json'
       - 'migrations/**'
       - '.github/workflows/deploy-workers.yml'
   workflow_dispatch:
-    inputs:
-      environment:
-        description: Wrangler environment to deploy
-        required: false
-        default: production
-        type: string
 
 concurrency:
   group: workers-${{ github.workflow }}-${{ github.ref }}
@@ -49,6 +54,7 @@ jobs:
 
   deploy:
     name: Deploy to Cloudflare workerd
+    if: github.event_name != 'pull_request'
     needs: test
     runs-on: ubuntu-latest
     permissions:
@@ -80,6 +86,10 @@ jobs:
 
       - name: Configure D1 database id
         run: |
+          if ! grep -q 'REPLACE_WITH_D1_DATABASE_ID' wrangler.toml; then
+            echo "D1 database id placeholder not found in wrangler.toml"
+            exit 1
+          fi
           sed -i "s|REPLACE_WITH_D1_DATABASE_ID|${{ secrets.D1_DATABASE_ID }}|" wrangler.toml
 
       - name: Apply D1 migrations
@@ -87,6 +97,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.122.0'
           command: d1 migrations apply stock-fetcher --remote
 
       - name: Deploy Worker
@@ -94,4 +105,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.122.0'
           command: deploy
