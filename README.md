@@ -1,11 +1,8 @@
-# Stock Price Fetcher
+# Stock Fetcher
 
-> **New:** A TypeScript backend for Cloudflare Workers (`workerd`) is in this
-> repository. See [WORKERS.md](WORKERS.md) for the TS implementation, D1 cache
-> setup, and the Cloudflare deploy workflow. The Go backend below remains as
-> the legacy Docker implementation.
-
-A Go web server that fetches historical stock price data with P/E ratios.
+A stock data service that fetches historical price data with P/E ratios,
+running on Cloudflare Workers (`workerd`) with a TypeScript backend and D1
+(SQLite) cache.
 
 ## Features
 
@@ -13,88 +10,58 @@ A Go web server that fetches historical stock price data with P/E ratios.
 - **HK Stocks**: Daily prices via Yahoo Finance
 - Period aggregation: weekly, monthly, quarterly, yearly
 - Drop day analysis (2%–5%+ buckets, close-based and low-based)
-- SQLite cache with delta fetching — first fetch ~10s, subsequent fetches ~20ms
+- D1-backed SQLite cache with delta fetching
 - Excel export
 - Responsive web UI with interactive charts (price, P/E) and EPS in tooltips
 - Mobile-friendly — chart renders on all screen sizes
-- AWS Lambda support
 
-## Running
+## Quick start
 
-```bash
-go build
-./stock-fetcher              # starts on :8080
-PORT=3000 ./stock-fetcher    # starts on :3000
-```
-
-## Docker
+Requires **Node.js 22 or newer** (24.x recommended).
 
 ```bash
-# Using published image
-docker compose up -d
+npm ci
+npm run typecheck
+npm test
 
-# Build from source
-docker compose up -d --build
+# Create the D1 database and apply migrations
+npx wrangler login
+npx wrangler d1 create stock-fetcher
+# paste the returned database_id into wrangler.toml
+npx wrangler d1 migrations apply stock-fetcher --local
+
+# Run locally
+npm run dev
 ```
 
-Cache is persisted in a named volume (`cache-data` → `/data/cache.db`).
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check + version info |
-| GET | `/api/stock/{symbol}` | Fetch stock data (JSON) |
-| GET | `/api/stock-excel/{symbol}` | Download Excel file |
-| GET | `/api/indices` | List available indices |
-| GET | `/api/indices/{name}` | List symbols in an index |
-| GET | `/` | Web UI |
-
-### Query Parameters
-
-| Param | Default | Values |
-|-------|---------|--------|
-| `days` | 1825 (5 years) | Number of days of historical data |
-| `period` | monthly | `daily`, `weekly`, `monthly`, `quarterly`, `yearly` |
-
-### Examples
+## Deployment
 
 ```bash
-curl localhost:8080/api/stock/AAPL
-curl localhost:8080/api/stock/AAPL?days=90\&period=daily
-curl localhost:8080/api/stock/0700.HK?days=365
-curl localhost:8080/api/indices/dow
+npx wrangler d1 migrations apply stock-fetcher --remote
+npx wrangler deploy
 ```
 
-## Cache
+The deployed worker is available at:
 
-Historical data is cached in SQLite. The DB path is auto-detected:
+```
+https://stock.<your-subdomain>.workers.dev
+```
 
-| Environment | Detection | DB path |
-|---|---|---|
-| Lambda | `AWS_LAMBDA_FUNCTION_NAME` env | `/tmp/cache.db` |
-| Docker | `/data` directory exists | `/data/cache.db` |
-| Local | fallback | `./cache.db` |
+See [WORKERS.md](WORKERS.md) for full architecture, API, data source,
+D1, and GitHub Actions deployment documentation.
 
-Override with `DB_PATH` env var. Set `DB_PATH=none` to disable caching.
-
-## Data Sources
+## Data sources
 
 | Stock Type | Source | P/E Ratio |
 |------------|--------|----------|
 | US Stocks | macrotrends.net | ✅ Yes (TTM, historical) |
+| US Stocks (fallback) | Yahoo Finance | ❌ No |
 | HK Stocks (.HK) | Yahoo Finance | ❌ No |
 
-US stocks automatically fall back to Yahoo Finance if macrotrends fails (e.g., ETFs).
+US stocks are fetched in this order:
 
-## Supported Indices
-
-| Index | Stocks | Description |
-|-------|--------|-------------|
-| `sp500` | 502 | S&P 500 |
-| `dow` | 30 | Dow Jones Industrial Average |
-| `nasdaq100` | 102 | NASDAQ 100 |
-| `hangseng` | 85 | Hang Seng Index |
+1. **macrotrends.net** — prices plus historical P/E
+2. **Yahoo Finance** — prices without P/E (fallback)
 
 ## License
 
