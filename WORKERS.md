@@ -23,6 +23,8 @@ This is a TypeScript rewrite of the Go backend for the Cloudflare Workers
 
 ## Local development
 
+Requires **Node.js 22 or newer** (24.x is recommended and used in CI).
+
 ```bash
 npm ci
 npm run typecheck
