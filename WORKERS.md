@@ -1,8 +1,8 @@
 # Cloudflare Workers (TypeScript) backend
 
-This is a TypeScript rewrite of the Go backend for the Cloudflare Workers
-(`workerd`) platform. It is stateless, serves the same JSON API, and uses D1
-(SQLite) for the same cache behavior.
+This is the TypeScript backend for the Cloudflare Workers (`workerd`)
+platform. It is stateless, serves a JSON API plus the static frontend, and
+uses D1 (SQLite) for caching.
 
 ## Layout
 
@@ -93,4 +93,3 @@ triggered manually from the Actions tab.
 - **Yahoo Finance** is an undocumented endpoint and may rate-limit datacenter
   IPs.
 - Excel generation uses `nodejs_compat` for Node `Buffer` support.
-- Go source files remain in this repository as the legacy implementation.

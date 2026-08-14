@@ -47,8 +47,34 @@ The deployed worker is available at:
 https://stock.<your-subdomain>.workers.dev
 ```
 
-See [WORKERS.md](WORKERS.md) for full architecture, API, data source,
-D1, and GitHub Actions deployment documentation.
+See [WORKERS.md](WORKERS.md) for full architecture, D1, and GitHub Actions
+deployment documentation.
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Health check + version info |
+| GET | `/api/stock/{symbol}` | Fetch stock data (JSON) |
+| GET | `/api/stock-excel/{symbol}` | Download Excel file |
+| GET | `/api/indices` | List available indices |
+| GET | `/api/indices/{name}` | List symbols in an index |
+| GET | `/` | Web UI |
+
+### Query parameters
+
+| Param | Default | Values |
+|-------|---------|--------|
+| `days` | `1825` (5 years) | Number of days of historical data |
+| `period` | `monthly` | `daily`, `weekly`, `monthly`, `quarterly`, `yearly` |
+| `source` | `auto` | `auto`, `macrotrends`, `yahoo` |
+
+`source` controls which provider is used:
+
+- `auto` tries macrotrends first, then Yahoo Finance.
+- A specific source forces only that provider.
+- HK stocks (`.HK`) only support `auto` and `yahoo`.
+- The `data_source` field in the response reports which provider was used.
 
 ## Data sources
 
